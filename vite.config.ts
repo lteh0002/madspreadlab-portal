@@ -10,6 +10,8 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  // Expose VITE_* and API_* env vars to client code (API_BASE_URL is public: the browser calls it)
+  envPrefix: ['VITE_', 'API_'],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

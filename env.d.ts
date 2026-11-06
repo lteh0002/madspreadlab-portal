@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   /** Base URL of the backend API, e.g. https://api.example.com */
-  readonly VITE_API_BASE_URL?: string
+  readonly API_BASE_URL?: string
 }
 
 interface ImportMeta {
