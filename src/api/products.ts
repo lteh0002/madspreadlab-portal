@@ -1,4 +1,4 @@
-import { API_BASE_URL, errorMessage } from './client'
+import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
 
 /** A new product record for the database, as entered on the admin page */
 export interface NewProduct {
@@ -42,7 +42,7 @@ export async function createProduct(
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     // fetch() only rejects on network failure (server down, DNS, CORS, offline)
-    throw new Error("Can't reach the server. It may be offline.")
+    throw new Error(NETWORK_ERROR)
   }
   if (!res.ok) throw new Error(await errorMessage(res))
 
@@ -76,7 +76,7 @@ export async function uploadProductData(file: File, signal?: AbortSignal): Promi
     res = await fetch(`${API_BASE_URL}/api/upload-data`, { method: 'POST', body: form, signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
-    throw new Error("Can't reach the server. It may be offline.")
+    throw new Error(NETWORK_ERROR)
   }
   if (!res.ok) throw new Error(await errorMessage(res))
 

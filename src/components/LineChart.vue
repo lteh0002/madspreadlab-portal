@@ -38,7 +38,12 @@ const props = withDefaults(
     /** Describes the chart for screen readers */
     ariaLabel?: string
     loading?: boolean
+    /** When set, the chart is blurred behind this message and a Retry button */
     error?: string | null
+    /** Shown under the error, e.g. "Retrying in 8s…" */
+    errorHint?: string
+    /** Shown over the blurred placeholder when there are no points (or use the #empty slot) */
+    emptyText?: string
     /**
      * Label time as trading days back from the last day instead of dates: the last day in the
      * data is T-0, the day before it T-1, and so on. Days are the distinct calendar dates of
@@ -61,6 +66,8 @@ const props = withDefaults(
     ariaLabel: 'Line chart',
     loading: false,
     error: null,
+    errorHint: '',
+    emptyText: 'No data for this range.',
     relativeDays: false,
     maxLabelledDay: null,
     dayStartHour: 0,
@@ -81,6 +88,16 @@ const ZOOM_SPEED = 0.002
 const TIME_LABEL_PX = 22
 
 const gradId = `line-area-${useId()}`
+
+/** Decorative stand-in drawn (blurred) when there's nothing to plot yet */
+const PLACEHOLDER = (() => {
+  const line = `M0,250 C110,210 190,280 300,225 S500,120 620,170 S840,95 ${W},135`
+  return {
+    line,
+    area: `${line} L${W},${H} L0,${H} Z`,
+    grid: [0.2, 0.4, 0.6, 0.8].map((f) => `M0 ${f * H} H${W}`).join(' '),
+  }
+})()
 const hover = ref<number | null>(null)
 const hitEl = ref<HTMLElement | null>(null)
 
@@ -369,6 +386,9 @@ const chart = computed(() => {
   }
 })
 
+/** Blur the chart: while loading, on error, or when there's nothing to plot */
+const veiled = computed(() => props.loading || !!props.error || !chart.value)
+
 const tip = computed(() => {
   const c = chart.value
   const i = hover.value
@@ -468,111 +488,142 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <div class="chart" :class="{ grouped: relativeDays }" :aria-busy="loading">
     <div ref="plotEl" class="plot">
-      <template v-if="chart">
-        <span v-for="t in chart.yTicks" :key="t.label" class="y-tick" :style="{ top: t.top }">
-          {{ t.label }}
-        </span>
-        <div class="x-axis">
-          <span v-for="t in chart.xTicks" :key="t.key" class="x-tick" :style="{ left: t.left }">
+      <!-- Everything drawn lives in the stage, which is blurred while loading, on error, or with no data -->
+      <div class="stage" :class="{ veiled: veiled }" :inert="veiled || undefined">
+        <template v-if="chart">
+          <span v-for="t in chart.yTicks" :key="t.label" class="y-tick" :style="{ top: t.top }">
             {{ t.label }}
           </span>
-          <!-- T-n charts: rotated times, then trading days, with dividers through both rows -->
-          <span
-            v-for="tk in chart.timeTicks"
-            :key="`time-${tk.key}`"
-            class="x-time"
-            :style="{ left: tk.left }"
-          >
-            {{ tk.label }}
-          </span>
-          <span
-            v-for="d in chart.dayLabels"
-            :key="`day-${d.key}`"
-            class="x-day"
-            :style="{ left: d.left }"
-          >
-            {{ d.label }}
-          </span>
-          <span
-            v-for="sep in chart.axisSeps"
-            :key="`sep-${sep.key}`"
-            class="x-sep"
-            :style="{ left: sep.left }"
-          />
-        </div>
-        <span class="last-tag" :style="{ top: chart.lastTag.top }">{{ chart.lastTag.label }}</span>
+          <div class="x-axis">
+            <span v-for="t in chart.xTicks" :key="t.key" class="x-tick" :style="{ left: t.left }">
+              {{ t.label }}
+            </span>
+            <!-- T-n charts: rotated times, then trading days, with dividers through both rows -->
+            <span
+              v-for="tk in chart.timeTicks"
+              :key="`time-${tk.key}`"
+              class="x-time"
+              :style="{ left: tk.left }"
+            >
+              {{ tk.label }}
+            </span>
+            <span
+              v-for="d in chart.dayLabels"
+              :key="`day-${d.key}`"
+              class="x-day"
+              :style="{ left: d.left }"
+            >
+              {{ d.label }}
+            </span>
+            <span
+              v-for="sep in chart.axisSeps"
+              :key="`sep-${sep.key}`"
+              class="x-sep"
+              :style="{ left: sep.left }"
+            />
+          </div>
+          <span class="last-tag" :style="{ top: chart.lastTag.top }">{{
+            chart.lastTag.label
+          }}</span>
 
+          <svg
+            class="svg"
+            :viewBox="`0 0 ${W} ${H}`"
+            preserveAspectRatio="none"
+            role="img"
+            :aria-label="ariaLabel"
+          >
+            <defs>
+              <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.2" />
+                <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path class="grid" :d="chart.grid" />
+            <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
+            <path :d="chart.area" :fill="`url(#${gradId})`" />
+            <path class="line" :d="chart.line" />
+          </svg>
+
+          <div
+            ref="hitEl"
+            class="hit"
+            :class="{ dragging }"
+            tabindex="0"
+            aria-label="Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data."
+            @pointerdown="onPointerDown"
+            @pointermove="onPointerMove"
+            @pointerup="endDrag"
+            @pointercancel="endDrag"
+            @pointerleave="onPointerLeave"
+            @wheel="onWheel"
+            @keydown="onKeydown"
+          >
+            <template v-if="tip">
+              <div class="crosshair" :style="{ left: tip.left }" />
+              <div class="dot" :style="{ left: tip.left, top: tip.top }" />
+              <div class="tooltip" :class="{ flip: tip.flip }" :style="{ left: tip.left }">
+                <span class="tip-date">{{ tip.date }}</span>
+                <span v-if="tip.when" class="tip-when">{{ tip.when }}</span>
+                <span class="tip-row">
+                  <span>{{ valueLabel }}</span
+                  ><strong>{{ tip.value }}</strong>
+                </span>
+                <span class="tip-row muted">
+                  <span>{{ intraday ? 'Change' : 'Day change' }}</span
+                  ><span>{{ tip.change }}</span>
+                </span>
+              </div>
+            </template>
+          </div>
+
+          <button
+            v-if="!chart.atLatest"
+            type="button"
+            class="to-latest"
+            aria-label="Jump to latest"
+            title="Jump to latest"
+            @click="showLatest(span())"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M6 6l6 6-6 6M13 6l6 6-6 6" />
+            </svg>
+          </button>
+        </template>
+
+        <!-- Nothing to plot yet: a faint stand-in chart, so the blur has a shape behind it -->
         <svg
-          class="svg"
+          v-else
+          class="svg placeholder"
           :viewBox="`0 0 ${W} ${H}`"
           preserveAspectRatio="none"
-          role="img"
-          :aria-label="ariaLabel"
+          aria-hidden="true"
         >
-          <defs>
-            <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.2" />
-              <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0" />
-            </linearGradient>
-          </defs>
-          <path class="grid" :d="chart.grid" />
-          <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
-          <path :d="chart.area" :fill="`url(#${gradId})`" />
-          <path class="line" :d="chart.line" />
+          <path class="grid" :d="PLACEHOLDER.grid" />
+          <path class="placeholder-area" :d="PLACEHOLDER.area" />
+          <path class="line" :d="PLACEHOLDER.line" />
         </svg>
-
-        <div
-          ref="hitEl"
-          class="hit"
-          :class="{ dragging }"
-          tabindex="0"
-          aria-label="Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data."
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="endDrag"
-          @pointercancel="endDrag"
-          @pointerleave="onPointerLeave"
-          @wheel="onWheel"
-          @keydown="onKeydown"
-        >
-          <template v-if="tip">
-            <div class="crosshair" :style="{ left: tip.left }" />
-            <div class="dot" :style="{ left: tip.left, top: tip.top }" />
-            <div class="tooltip" :class="{ flip: tip.flip }" :style="{ left: tip.left }">
-              <span class="tip-date">{{ tip.date }}</span>
-              <span v-if="tip.when" class="tip-when">{{ tip.when }}</span>
-              <span class="tip-row">
-                <span>{{ valueLabel }}</span
-                ><strong>{{ tip.value }}</strong>
-              </span>
-              <span class="tip-row muted">
-                <span>{{ intraday ? 'Change' : 'Day change' }}</span
-                ><span>{{ tip.change }}</span>
-              </span>
-            </div>
-          </template>
-        </div>
-
-        <button
-          v-if="!chart.atLatest"
-          type="button"
-          class="to-latest"
-          aria-label="Jump to latest"
-          title="Jump to latest"
-          @click="showLatest(span())"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path d="M6 6l6 6-6 6M13 6l6 6-6 6" />
-          </svg>
-        </button>
-      </template>
-
-      <div v-if="loading && !error" class="state">Loading…</div>
-      <div v-else-if="error" class="state">
-        <span>{{ error }}</span>
-        <button type="button" class="retry" @click="$emit('retry')">Retry</button>
       </div>
-      <div v-else-if="!chart" class="state">No data for this range.</div>
+
+      <div v-if="loading && !error" class="state" role="status">
+        <span class="shimmer" aria-hidden="true" />
+        <span class="state-card">
+          <span class="spinner" aria-hidden="true" />
+          Loading chart…
+        </span>
+      </div>
+      <div v-else-if="error" class="state" role="alert">
+        <span class="state-card column">
+          <span class="state-title">{{ error }}</span>
+          <span v-if="errorHint" class="state-hint">{{ errorHint }}</span>
+          <button type="button" class="retry" @click="$emit('retry')">Retry</button>
+        </span>
+      </div>
+      <div v-else-if="!chart" class="state" role="status">
+        <span class="state-card">
+          <slot name="empty">{{ emptyText }}</slot>
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -797,16 +848,111 @@ function onKeydown(e: KeyboardEvent) {
   color: var(--color-text-muted);
 }
 
+/* ---------- Loading / error / empty: blur the chart, message on top ---------- */
+.stage {
+  position: absolute;
+  inset: 0;
+  transition:
+    filter 0.2s,
+    opacity 0.2s;
+}
+.stage.veiled {
+  filter: blur(6px);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+.placeholder .line {
+  stroke: var(--color-text-muted);
+  opacity: 0.6;
+}
+.placeholder-area {
+  fill: var(--color-accent-soft);
+}
+
 .state {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   color: var(--color-text-muted);
   font-size: 0.9rem;
+}
+.state-card {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(420px, 90%);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--color-border-hover);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-background-soft) 85%, transparent);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text);
+  text-align: center;
+}
+.state-card :deep(a) {
+  white-space: nowrap;
+}
+.state-card.column {
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.state-hint {
+  margin-top: -0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.state-title {
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+/* A soft band of light sweeping across the blurred chart while it loads */
+.shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--color-accent) 12%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-hover);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer,
+  .spinner {
+    animation: none;
+  }
+  .stage {
+    transition: none;
+  }
 }
 
 .retry {

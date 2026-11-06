@@ -47,10 +47,56 @@ const spreadId = ref('')
 const interval = ref(0)
 
 const points = ref<LinePoint[]>([])
+/**
+ * The pickers, range buttons and "Close · …" line show only once there's a chart. They stay
+ * while switching spread (the previous chart is still on screen, blurred, until the new one loads).
+ */
+const ready = computed(() => points.value.length > 0)
 const view = ref<ChartView | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const truncated = ref(false)
+
+/* ---------- Auto-retry after a failed request, like the cash table page ---------- */
+const RETRY_SECONDS = 10
+const retryIn = ref(0)
+let retryTimer: ReturnType<typeof setInterval> | undefined
+
+const errorHint = computed(() =>
+  retryIn.value > 0 ? `Retrying in ${retryIn.value}s…` : 'Retrying…',
+)
+
+function stopRetryTimer() {
+  clearInterval(retryTimer)
+  retryTimer = undefined
+}
+
+/** Count down, then try again automatically */
+function scheduleRetry() {
+  stopRetryTimer()
+  retryIn.value = RETRY_SECONDS
+  retryTimer = setInterval(() => {
+    retryIn.value -= 1
+    if (retryIn.value <= 0) {
+      stopRetryTimer()
+      retry()
+    }
+  }, 1000)
+}
+
+/** Start of every request: cancel a pending auto-retry. While an error is showing, keep it up (with
+ * "Retrying…") instead of flashing the loading state, so the screen doesn't flicker. */
+function beginRequest() {
+  stopRetryTimer()
+  retryIn.value = 0
+  if (!error.value) loading.value = true
+}
+
+function fail(e: unknown) {
+  error.value = (e as Error).message
+  loading.value = false
+  scheduleRetry()
+}
 
 let spreadsCtl: AbortController | undefined
 let barsCtl: AbortController | undefined
@@ -90,64 +136,92 @@ const dayRanges = computed(() => {
   return ranges
 })
 
-/**
- * Buttons, top right: everything, the opening window (T-lastDay … T-0), then one per day
- * T-lastDay … T-0 that zooms to just that day. Days with no data get no button.
- */
-const ranges = computed(() => {
-  const n = points.value.length
-  const days = dayRanges.value
-  if (!n) return []
-  const newest = Math.min(lastDay.value, days.length - 1)
-  return [
-    { label: 'All', title: 'All data', first: 0, last: n - 1, day: false },
-    {
-      label: `T-${newest} → T-0`,
-      title: `T-${newest} to T-0`,
-      first: days[newest]!.first,
-      last: n - 1,
-      day: false,
-    },
-    ...days
-      .slice(0, newest + 1)
-      .map((r, t) => ({ label: `T-${t}`, title: `Zoom to T-${t}`, ...r, day: true }))
-      .reverse(),
-  ]
-})
+/* ---------- Day strip: All, then one chip per day T-lastDay … T-0 ---------- */
+/** Oldest day with a chip (T-lastDay, or fewer if there isn't that much data) */
+const oldestChip = computed(() => Math.min(lastDay.value, dayRanges.value.length - 1))
+/** T numbers with a chip, oldest (left) first: [5, 4, 3, 2, 1, 0] */
+const chipDays = computed(() =>
+  Array.from({ length: oldestChip.value + 1 }, (_, i) => oldestChip.value - i),
+)
 
-/* ---------- Per-day buttons (T-5 … T-0) can be hidden; remembered in this browser ---------- */
-const DAY_BUTTONS_KEY = 'msl-chart-day-buttons'
-function readShowDays() {
-  try {
-    return localStorage.getItem(DAY_BUTTONS_KEY) !== 'hidden'
-  } catch {
-    return true
-  }
+/** Show T-a … T-b. Order doesn't matter: the range always runs older → newer. */
+function showDays(a: number, b: number) {
+  const days = dayRanges.value
+  const from = days[Math.max(a, b)]
+  const to = days[Math.min(a, b)]
+  if (from && to) chartRef.value?.showRange(from.first, to.last)
 }
-const showDays = ref(readShowDays())
-function toggleDays() {
-  showDays.value = !showDays.value
-  try {
-    localStorage.setItem(DAY_BUTTONS_KEY, showDays.value ? 'shown' : 'hidden')
-  } catch {
-    // storage unavailable (private mode etc.) — the toggle still works for this visit
-  }
+function showAll() {
+  chartRef.value?.showRange(0, points.value.length - 1)
 }
-const visibleRanges = computed(() => ranges.value.filter((r) => !r.day || showDays.value))
 
 /** Opens on T-lastDay … T-0 */
 const initialCount = computed(() => {
   const days = dayRanges.value
   if (!days.length) return 1
-  return points.value.length - days[Math.min(lastDay.value, days.length - 1)]!.first
+  return points.value.length - days[oldestChip.value]!.first
 })
 
-/** A button is lit only while the chart shows exactly its bars (any pan or zoom clears it) */
-const activeRange = computed(() => {
+/**
+ * Days the chart shows exactly, as { from, to } T numbers (from ≥ to), or null when the view
+ * doesn't line up with whole chip days (after a pan or zoom). Drives the chip highlight.
+ */
+const selected = computed(() => {
   const v = view.value
-  if (!v) return null
-  return ranges.value.find((r) => r.first === v.first && r.last === v.last)?.label ?? null
+  const days = dayRanges.value
+  if (!v || !days.length) return null
+  const from = chipDays.value.find((t) => days[t]!.first === v.first)
+  const to = chipDays.value.find((t) => days[t]!.last === v.last)
+  return from !== undefined && to !== undefined && from >= to ? { from, to } : null
 })
+const allActive = computed(
+  () => !!view.value && view.value.first === 0 && view.value.last === points.value.length - 1,
+)
+const inSelection = (t: number) => !!selected.value && t <= selected.value.from && t >= selected.value.to
+
+/*
+ * Picking days: press a chip for that day; drag across chips (mouse or touch) or Shift-click
+ * a second chip for a range. Keyboard: Enter/Space picks a day, Shift+Enter extends.
+ */
+let anchor: number | null = null
+let dragging = false
+
+function chipAt(x: number, y: number): number | null {
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-day]')
+  return el ? Number(el.dataset.day) : null
+}
+function onChipDown(e: PointerEvent, t: number) {
+  if (e.button !== 0) return
+  // Touch captures the pointer to the first chip; release so the drag can reach the others
+  ;(e.target as Element).releasePointerCapture?.(e.pointerId)
+  if (e.shiftKey && anchor !== null) {
+    showDays(anchor, t)
+  } else {
+    anchor = t
+    showDays(t, t)
+  }
+  dragging = true
+  window.addEventListener('pointerup', endDrag, { once: true })
+  window.addEventListener('pointercancel', endDrag, { once: true })
+}
+function onStripMove(e: PointerEvent) {
+  if (!dragging || anchor === null) return
+  const t = chipAt(e.clientX, e.clientY)
+  if (t !== null) showDays(anchor, t)
+}
+function endDrag() {
+  dragging = false
+}
+/** Keyboard only (pointer presses are handled on pointerdown; their click has detail ≥ 1) */
+function onChipClick(e: MouseEvent, t: number) {
+  if (e.detail !== 0) return
+  if (e.shiftKey && anchor !== null) showDays(anchor, t)
+  else {
+    anchor = t
+    showDays(t, t)
+  }
+}
+onUnmounted(endDrag)
 
 const period = computed(() => {
   const v = view.value
@@ -160,8 +234,7 @@ const period = computed(() => {
 async function loadSpreads() {
   spreadsCtl?.abort()
   spreadsCtl = new AbortController()
-  loading.value = true
-  error.value = null
+  beginRequest()
   points.value = []
   try {
     const res = await fetchProductSpreads(props.product, spreadsCtl.signal)
@@ -174,14 +247,23 @@ async function loadSpreads() {
         : res.data.filter((s) => s.intervals.some((i) => i.interval === fixed))
     // Nearest contracts first; default to the fixed interval, else the shortest one
     const first = spreads.value[0]
-    spreadId.value = first?.id ?? ''
-    interval.value = fixed ?? first?.intervals[0]?.interval ?? 0
-    if (!first) loading.value = false
-    // loading the bars is triggered by the spreadId/interval watcher
+    const nextId = first?.id ?? ''
+    const nextInterval = fixed ?? first?.intervals[0]?.interval ?? 0
+    const unchanged = nextId === spreadId.value && nextInterval === interval.value
+    spreadId.value = nextId
+    interval.value = nextInterval
+    if (!first) {
+      // Nothing to plot: done, and clear any error left from a failed earlier attempt
+      error.value = null
+      loading.value = false
+    } else if (unchanged) {
+      // The spreadId/interval watcher won't fire, so load the bars here
+      loadBars()
+    }
+    // otherwise loading the bars is triggered by the spreadId/interval watcher
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
-    error.value = (e as Error).message
-    loading.value = false
+    fail(e)
   }
 }
 
@@ -189,17 +271,16 @@ async function loadBars() {
   if (!spreadId.value || !interval.value) return
   barsCtl?.abort()
   barsCtl = new AbortController()
-  loading.value = true
-  error.value = null
+  beginRequest()
   try {
     const res = await fetchPriceData(spreadId.value, interval.value, barsCtl.signal)
     points.value = res.data.map((b) => ({ date: b.timestamp, value: b.close }))
     truncated.value = res.truncated
+    error.value = null
+    loading.value = false
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
-    error.value = (e as Error).message
-  } finally {
-    loading.value = false
+    fail(e)
   }
 }
 
@@ -220,6 +301,7 @@ function retry() {
 onUnmounted(() => {
   spreadsCtl?.abort()
   barsCtl?.abort()
+  stopRetryTimer()
 })
 </script>
 
@@ -233,7 +315,7 @@ onUnmounted(() => {
     </p>
 
     <section class="card" aria-label="Price chart">
-      <header class="card-head">
+      <header v-if="ready" class="card-head">
         <div class="pickers">
           <label class="picker">
             <span class="picker-label">Spread</span>
@@ -262,49 +344,45 @@ onUnmounted(() => {
           </label>
         </div>
 
-        <div class="ranges" role="group" aria-label="Date range">
+        <div v-if="chipDays.length" class="ranges" role="group" aria-label="Days shown">
           <button
-            v-for="r in visibleRanges"
-            :key="r.label"
             type="button"
-            :title="r.title"
-            :class="{ active: activeRange === r.label }"
-            :aria-pressed="activeRange === r.label"
-            @click="chartRef?.showRange(r.first, r.last)"
+            title="All data"
+            :class="{ active: allActive }"
+            :aria-pressed="allActive"
+            @click="showAll"
           >
-            {{ r.label }}
+            All
           </button>
-          <button
-            v-if="ranges.some((r) => r.day)"
-            type="button"
-            class="days-toggle"
-            :aria-expanded="showDays"
-            :title="showDays ? 'Hide the per-day buttons' : 'Show a button for each day'"
-            @click="toggleDays"
-          >
-            Days
-            <AppIcon
-              name="chevron"
-              :size="14"
-              :stroke-width="2.25"
-              class="days-chev"
-              :class="{ open: showDays }"
-            />
-          </button>
+          <span class="divider" aria-hidden="true" />
+          <div class="day-strip" @pointermove="onStripMove">
+            <button
+              v-for="t in chipDays"
+              :key="t"
+              type="button"
+              :data-day="t"
+              :title="`T-${t} · drag or Shift-click for a range`"
+              :class="{
+                in: inSelection(t),
+                start: inSelection(t) && t === selected?.from,
+                end: inSelection(t) && t === selected?.to,
+              }"
+              :aria-pressed="inSelection(t)"
+              @pointerdown="onChipDown($event, t)"
+              @click="onChipClick($event, t)"
+            >
+              T-{{ t }}
+            </button>
+          </div>
         </div>
       </header>
 
-      <p class="period">
-        Close · {{ period }}
+      <p v-if="ready" class="period">
+        Close<template v-if="period"> · {{ period }}</template>
         <span v-if="truncated"> · showing the most recent bars only</span>
       </p>
 
-      <div v-if="!loading && !error && !spreads.length" class="empty">
-        No{{ fixedInterval ? ` ${fixedInterval}-min` : '' }} price data for {{ product }} yet.
-        Upload a file under <RouterLink to="/admin">Admin › Upload data</RouterLink>.
-      </div>
       <LineChart
-        v-else
         ref="chart"
         :points="points"
         :initial-count="initialCount"
@@ -316,11 +394,19 @@ onUnmounted(() => {
         :aria-label="`${product} ${spread ? spreadLabel(spread) : ''} closing price, ${period}`"
         :loading="loading"
         :error="error"
+        :error-hint="errorHint"
         @view-change="view = $event"
         @retry="retry"
-      />
+      >
+        <template #empty>
+          <span>
+            No{{ fixedInterval ? ` ${fixedInterval}-min` : '' }} price data for {{ product }} yet.
+            Upload one in <RouterLink to="/admin">Admin › Upload data</RouterLink>
+          </span>
+        </template>
+      </LineChart>
       <p class="hint">
-        T-0 = last trading day · T-X = before T-{{ lastDay }} · drag to pan · scroll to zoom · times
+        T-0 = last trading day · T-X = before T-{{ lastDay }} · drag across days for a range · drag the chart to pan · scroll to zoom · times
         in Malaysia time (MYT)
       </p>
     </section>
@@ -426,12 +512,6 @@ select:focus-visible {
   color: var(--color-text-muted);
 }
 
-.empty {
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--color-text-muted);
-}
-
 .ranges {
   display: flex;
   flex-wrap: wrap;
@@ -454,7 +534,7 @@ select:focus-visible {
   color: var(--color-text);
   cursor: pointer;
 }
-.ranges button:hover:not(.active):not(:disabled) {
+.ranges button:hover:not(.active):not(.in):not(:disabled) {
   background: var(--color-background-mute);
 }
 .ranges button.active {
@@ -465,30 +545,43 @@ select:focus-visible {
   opacity: 0.5;
   cursor: default;
 }
-.ranges .days-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-left: 2px;
-  padding-inline: 0.55rem 0.4rem;
-  color: var(--color-text-muted);
-  border-left: 1px solid var(--color-border);
+.divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.2rem 0.25rem;
+  background: var(--color-border);
+}
+/* Chips touch, so the selected days read as one continuous pill */
+.day-strip {
+  display: flex;
+  touch-action: pan-y; /* horizontal drags select days; vertical still scrolls the page */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.day-strip button {
+  border-radius: 0;
+}
+.day-strip button:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.day-strip button:last-child {
   border-radius: 0 7px 7px 0;
 }
-.ranges .days-toggle:hover {
-  color: var(--color-heading);
+.day-strip button.in {
+  background: var(--color-accent-solid);
+  color: var(--color-on-accent);
 }
-/* Chevron points right when hidden ("more"), left when shown ("collapse") */
-.days-chev {
-  transition: transform 0.15s;
+.day-strip button.in.start {
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 7px;
 }
-.days-chev.open {
-  transform: rotate(180deg);
+.day-strip button.in.end {
+  border-top-right-radius: 7px;
+  border-bottom-right-radius: 7px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .days-chev {
-    transition: none;
-  }
+/* Faint seam between selected days so each chip is still readable */
+.day-strip button.in:not(.start) {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-on-accent) 25%, transparent);
 }
 .ranges button:focus-visible {
   outline: 2px solid var(--color-accent);

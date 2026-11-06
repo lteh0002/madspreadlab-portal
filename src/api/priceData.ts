@@ -1,4 +1,4 @@
-import { API_BASE_URL, errorMessage } from './client'
+import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
 
 export interface SpreadInterval {
   /** Bar length in minutes, e.g. 15 */
@@ -43,7 +43,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     // fetch() only rejects on network failure (server down, DNS, CORS, offline)
-    throw new Error("Can't reach the server. It may be offline.")
+    throw new Error(NETWORK_ERROR)
   }
   if (!res.ok) throw new Error(await errorMessage(res))
   return (await res.json()) as T

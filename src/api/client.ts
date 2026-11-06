@@ -1,3 +1,6 @@
+/** Shown when the backend can't be reached at all (server down, DNS, CORS, offline) */
+export const NETWORK_ERROR = "Can't reach server"
+
 /** Backend base URL from the API_BASE_URL env var (no trailing slash); empty = same origin */
 export const API_BASE_URL = (import.meta.env.API_BASE_URL ?? '').replace(/\/$/, '')
 

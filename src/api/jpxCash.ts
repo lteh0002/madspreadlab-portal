@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './client'
+import { API_BASE_URL, NETWORK_ERROR } from './client'
 
 export interface JpxCashRecord {
   _id: string
@@ -49,7 +49,7 @@ export async function fetchJpxCash(
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     // fetch() only rejects on network failure (server down, DNS, CORS, offline)
-    throw new Error("Can't reach the server. It may be offline.")
+    throw new Error(NETWORK_ERROR)
   }
   if (!res.ok) {
     throw new Error(`The server returned an error (${res.status}).`)
