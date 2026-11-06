@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import LineChart, { type ChartView, type LinePoint } from '@/components/LineChart.vue'
@@ -177,7 +177,44 @@ const selected = computed(() => {
 const allActive = computed(
   () => !!view.value && view.value.first === 0 && view.value.last === points.value.length - 1,
 )
-const inSelection = (t: number) => !!selected.value && t <= selected.value.from && t >= selected.value.to
+const inSelection = (t: number) =>
+  !!selected.value && t <= selected.value.from && t >= selected.value.to
+
+/*
+ * Small screens get a dropdown instead of the chips (CSS decides which shows). It drives the
+ * same showDays/showAll, so chart, chips and dropdown always agree. Values: "all" or "from-to".
+ */
+const dayLabel = (t: number) => `T-${t}`
+const dayOptions = computed(() => {
+  const days = chipDays.value
+  if (!days.length) return []
+  const oldest = days[0]!
+  const opts = [
+    { value: 'all', label: 'All data' },
+    { value: `${oldest}-0`, label: `${dayLabel(oldest)} → T-0` },
+    ...days.map((t) => ({ value: `${t}-${t}`, label: dayLabel(t) })),
+  ]
+  // A span picked another way (chip drag, Shift-click) gets its own entry so the box shows it
+  const sel = selected.value
+  if (sel && !opts.some((o) => o.value === `${sel.from}-${sel.to}`))
+    opts.splice(2, 0, {
+      value: `${sel.from}-${sel.to}`,
+      label: `${dayLabel(sel.from)} → ${dayLabel(sel.to)}`,
+    })
+  return opts
+})
+/** What the dropdown shows: the matching option, or "" (Custom view) after a pan or zoom */
+const dayChoice = computed(() => {
+  if (allActive.value) return 'all'
+  const sel = selected.value
+  return sel ? `${sel.from}-${sel.to}` : ''
+})
+function onDayChoice(e: Event) {
+  const value = (e.target as HTMLSelectElement).value
+  if (value === 'all') return showAll()
+  const [from, to] = value.split('-').map(Number)
+  if (from !== undefined && to !== undefined) showDays(from, to)
+}
 
 /*
  * Picking days: press a chip for that day; drag across chips (mouse or touch) or Shift-click
@@ -222,6 +259,26 @@ function onChipClick(e: MouseEvent, t: number) {
   }
 }
 onUnmounted(endDrag)
+
+/*
+ * Compact mode: when the chart card is too narrow for the chip strip (iPhone SE and similar),
+ * show the Days dropdown instead. Measured on the card itself, so it follows the real space
+ * available, whatever the screen size, browser zoom or text size.
+ */
+const COMPACT_BELOW_PX = 440
+const cardEl = ref<HTMLElement | null>(null)
+const compact = ref(false)
+let cardObs: ResizeObserver | undefined
+onMounted(() => {
+  const el = cardEl.value
+  if (!el) return
+  const measure = (w: number) => (compact.value = w < COMPACT_BELOW_PX)
+  measure(el.getBoundingClientRect().width)
+  if (typeof ResizeObserver === 'undefined') return
+  cardObs = new ResizeObserver(([entry]) => entry && measure(entry.contentRect.width))
+  cardObs.observe(el)
+})
+onUnmounted(() => cardObs?.disconnect())
 
 const period = computed(() => {
   const v = view.value
@@ -314,7 +371,7 @@ onUnmounted(() => {
       <template v-if="info">{{ info.exchange }} · {{ info.currency }} · </template>Calendar spread
     </p>
 
-    <section class="card" aria-label="Price chart">
+    <section ref="cardEl" class="card" aria-label="Price chart">
       <header v-if="ready" class="card-head">
         <div class="pickers">
           <label class="picker">
@@ -344,7 +401,21 @@ onUnmounted(() => {
           </label>
         </div>
 
-        <div v-if="chipDays.length" class="ranges" role="group" aria-label="Days shown">
+        <!-- Small screens: the same choice as a dropdown (shown instead of the chips by CSS) -->
+        <label v-if="compact && dayOptions.length" class="picker days-picker">
+          <span class="picker-label">Days</span>
+          <span class="select-wrap">
+            <select :value="dayChoice" @change="onDayChoice">
+              <option v-if="!dayChoice" value="" disabled>Custom view</option>
+              <option v-for="o in dayOptions" :key="o.value" :value="o.value">
+                {{ o.label }}
+              </option>
+            </select>
+            <AppIcon name="chevron-down" :size="16" class="select-chev" />
+          </span>
+        </label>
+
+        <div v-if="!compact && chipDays.length" class="ranges" role="group" aria-label="Days shown">
           <button
             type="button"
             title="All data"
@@ -406,8 +477,8 @@ onUnmounted(() => {
         </template>
       </LineChart>
       <p class="hint">
-        T-0 = last trading day · T-X = before T-{{ lastDay }} · drag across days for a range · drag the chart to pan · scroll to zoom · times
-        in Malaysia time (MYT)
+        T-0 = last trading day · T-X = before T-{{ lastDay }} · drag across days for a range · drag
+        the chart to pan · scroll to zoom · times in Malaysia time (MYT)
       </p>
     </section>
   </main>
@@ -586,5 +657,37 @@ select:focus-visible {
 .ranges button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/*
+ * Phones: the group would wrap, stranding "All" on one line and the day strip on the next.
+ * Instead it takes its own full-width row, never wraps, and the day chips share the width equally.
+ */
+/* Compact mode (narrow card): the Days dropdown takes its own full-width row */
+.days-picker {
+  flex: 1 1 100%;
+}
+.days-picker select {
+  width: 100%;
+  min-height: 2.75rem; /* comfortable tap target */
+}
+
+@media (max-width: 640px) {
+  .ranges {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .ranges button {
+    min-height: 2.5rem; /* easier to tap */
+  }
+  .day-strip {
+    flex: 1;
+    min-width: 0;
+  }
+  .day-strip button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 0;
+  }
 }
 </style>
