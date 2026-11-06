@@ -106,6 +106,17 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             badge: 'FKLI',
             tags: ['Malaysia'],
           },
+          {
+            name: 'roll-mca',
+            label: 'MCA Roll',
+            pageTitle: 'MCA Index Roll',
+            routeName: 'index-roll',
+            routeParams: { market: 'mca' },
+            description: 'MCA index roll',
+            emoji: '🇨🇳',
+            badge: 'MCA',
+            tags: ['China'],
+          },
         ],
       },
       {
