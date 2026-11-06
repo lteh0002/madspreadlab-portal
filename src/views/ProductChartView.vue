@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import LineChart, { type ChartView, type LinePoint } from '@/components/LineChart.vue'
@@ -209,11 +209,17 @@ const dayChoice = computed(() => {
   const sel = selected.value
   return sel ? `${sel.from}-${sel.to}` : ''
 })
-function onDayChoice(e: Event) {
-  const value = (e.target as HTMLSelectElement).value
+/** The dropdown's last pick; null = the default, T-lastDay → T-0 */
+const lockedChoice = ref<string | null>(null)
+
+function applyChoice(value: string) {
   if (value === 'all') return showAll()
   const [from, to] = value.split('-').map(Number)
   if (from !== undefined && to !== undefined) showDays(from, to)
+}
+function onDayChoice(e: Event) {
+  lockedChoice.value = (e.target as HTMLSelectElement).value
+  applyChoice(lockedChoice.value)
 }
 
 /*
@@ -279,6 +285,23 @@ onMounted(() => {
   cardObs.observe(el)
 })
 onUnmounted(() => cardObs?.disconnect())
+
+/*
+ * Compact mode also locks the chart (no drag/zoom), so it always shows exactly the dropdown's
+ * pick. Re-apply it whenever new data arrives (spread switch, retry) or compact mode starts;
+ * after the DOM update, so it runs after the chart has placed its own default view.
+ */
+watch(
+  [points, compact],
+  async () => {
+    if (!compact.value || !points.value.length) return
+    await nextTick()
+    const pick = lockedChoice.value
+    const valid = pick && dayOptions.value.some((o) => o.value === pick)
+    applyChoice(valid ? pick : `${oldestChip.value}-0`)
+  },
+  { flush: 'post' },
+)
 
 const period = computed(() => {
   const v = view.value
@@ -459,6 +482,7 @@ onUnmounted(() => {
         :initial-count="initialCount"
         value-label="Close"
         relative-days
+        :locked="compact"
         :max-labelled-day="lastDay"
         :day-start-hour="DAY_START_HOUR"
         :display-zone="ZONE"
@@ -476,7 +500,10 @@ onUnmounted(() => {
           </span>
         </template>
       </LineChart>
-      <p class="hint">
+      <p v-if="compact" class="hint">
+        T-0 = last trading day · tap the chart for a price · times in Malaysia time (MYT)
+      </p>
+      <p v-else class="hint">
         T-0 = last trading day · T-X = before T-{{ lastDay }} · drag across days for a range · drag
         the chart to pan · scroll to zoom · times in Malaysia time (MYT)
       </p>

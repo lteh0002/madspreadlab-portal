@@ -57,6 +57,11 @@ const props = withDefaults(
      * so a night session running past midnight counts with the day it started.
      */
     dayStartHour?: number
+    /**
+     * Fixed view: no drag, wheel or keyboard pan/zoom (wheel and swipes scroll the page instead).
+     * The view only changes through showRange/showLatest. Hover/tap still shows the tooltip.
+     */
+    locked?: boolean
     /** Zone intraday times are shown in (and days split by), e.g. MYT. Plain dates are unaffected. */
     displayZone?: DisplayZone
   }>(),
@@ -71,6 +76,7 @@ const props = withDefaults(
     relativeDays: false,
     maxLabelledDay: null,
     dayStartHour: 0,
+    locked: false,
     displayZone: () => UTC,
   },
 )
@@ -84,6 +90,10 @@ const H = 360
 const MIN_SPAN = 5
 /** Wheel zoom sensitivity per pixel of scroll */
 const ZOOM_SPEED = 0.002
+/** Room the tooltip needs beside the crosshair (its widest line plus the 14px gap) */
+const TOOLTIP_PX = 215
+/** How far the tooltip may spill into the axis gutters on either side of the plot */
+const GUTTER_PX = 40
 /** Horizontal room each rotated time label needs on a T-n axis */
 const TIME_LABEL_PX = 22
 
@@ -389,6 +399,14 @@ const chart = computed(() => {
 /** Blur the chart: while loading, on error, or when there's nothing to plot */
 const veiled = computed(() => props.loading || !!props.error || !chart.value)
 
+function tooltipSide(fx: number): 'right' | 'left' | 'center' {
+  const at = fx * plotWidth.value
+  if (at + TOOLTIP_PX <= plotWidth.value + GUTTER_PX && fx <= 0.6) return 'right'
+  if (at - TOOLTIP_PX >= -GUTTER_PX) return 'left'
+  if (at + TOOLTIP_PX <= plotWidth.value + GUTTER_PX) return 'right'
+  return 'center'
+}
+
 const tip = computed(() => {
   const c = chart.value
   const i = hover.value
@@ -403,7 +421,8 @@ const tip = computed(() => {
     : fmt.value.longDate.format(d)
   return {
     ...pos,
-    flip: pos.fx > 0.6,
+    // Right of the crosshair if it fits, else left, else (very narrow plots) centred on top
+    side: tooltipSide(pos.fx),
     // With T-n labels: the trading day as the heading, the actual date and time beneath it
     date: props.relativeDays ? tLabel(i) : when,
     when: props.relativeDays ? when : '',
@@ -432,6 +451,11 @@ function updateHover(fx: number) {
 
 function onPointerDown(e: PointerEvent) {
   if (e.button !== 0 || !view.value) return
+  if (props.locked) {
+    // No panning: a tap just shows the tooltip for the bar under the finger
+    updateHover(plotFraction(e.clientX).fx)
+    return
+  }
   hitEl.value?.setPointerCapture(e.pointerId)
   drag = { x: e.clientX, start: view.value.start, span: span() }
   dragging.value = true
@@ -449,12 +473,14 @@ function endDrag(e: PointerEvent) {
   dragging.value = false
 }
 
-function onPointerLeave() {
+function onPointerLeave(e: PointerEvent) {
+  // Locked (mobile): a tap's tooltip stays after the finger lifts, until the next tap
+  if (props.locked && e.pointerType !== 'mouse') return
   if (!drag) hover.value = null
 }
 
 function onWheel(e: WheelEvent) {
-  if (!view.value) return
+  if (!view.value || props.locked) return // locked: let the page scroll
   e.preventDefault() // the chart owns the wheel, like TradingView
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
   let dx = e.deltaX * unit
@@ -468,6 +494,7 @@ function onWheel(e: WheelEvent) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (props.locked) return
   const actions: Record<string, () => void> = {
     ArrowLeft: () => panBy(-0.1),
     ArrowRight: () => panBy(0.1),
@@ -548,9 +575,13 @@ function onKeydown(e: KeyboardEvent) {
           <div
             ref="hitEl"
             class="hit"
-            :class="{ dragging }"
-            tabindex="0"
-            aria-label="Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data."
+            :class="{ dragging, locked }"
+            :tabindex="locked ? undefined : 0"
+            :aria-label="
+              locked
+                ? undefined
+                : 'Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data.'
+            "
             @pointerdown="onPointerDown"
             @pointermove="onPointerMove"
             @pointerup="endDrag"
@@ -562,7 +593,11 @@ function onKeydown(e: KeyboardEvent) {
             <template v-if="tip">
               <div class="crosshair" :style="{ left: tip.left }" />
               <div class="dot" :style="{ left: tip.left, top: tip.top }" />
-              <div class="tooltip" :class="{ flip: tip.flip }" :style="{ left: tip.left }">
+              <div
+                class="tooltip"
+                :class="tip.side"
+                :style="{ left: tip.side === 'center' ? '50%' : tip.left }"
+              >
                 <span class="tip-date">{{ tip.date }}</span>
                 <span v-if="tip.when" class="tip-when">{{ tip.when }}</span>
                 <span class="tip-row">
@@ -578,7 +613,7 @@ function onKeydown(e: KeyboardEvent) {
           </div>
 
           <button
-            v-if="!chart.atLatest"
+            v-if="!chart.atLatest && !locked"
             type="button"
             class="to-latest"
             aria-label="Jump to latest"
@@ -748,6 +783,11 @@ function onKeydown(e: KeyboardEvent) {
   user-select: none;
   border-radius: 4px;
 }
+.hit.locked {
+  cursor: default;
+  /* nothing to drag: every swipe scrolls the page */
+  touch-action: auto;
+}
 .hit.dragging {
   cursor: grabbing;
 }
@@ -822,8 +862,13 @@ function onKeydown(e: KeyboardEvent) {
   transform: translateX(14px);
   pointer-events: none;
 }
-.tooltip.flip {
+.tooltip.left {
   transform: translateX(calc(-100% - 14px));
+}
+/* Not enough room on either side (narrow phones): centred over the plot instead */
+.tooltip.center {
+  transform: translateX(-50%);
+  max-width: calc(100% + 5rem);
 }
 .tip-when {
   margin-top: -0.15rem;
