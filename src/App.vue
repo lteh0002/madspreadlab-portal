@@ -4,10 +4,10 @@ import { RouterLink, RouterView } from 'vue-router'
 
 <template>
   <header>
-    <span class="brand">MadSpreadLab</span>
+    <RouterLink to="/" class="brand">MadSpreadLab</RouterLink>
     <nav>
-      <RouterLink to="/">Spreads</RouterLink>
-      <RouterLink to="/about">About</RouterLink>
+      <RouterLink to="/">Home</RouterLink>
+      <RouterLink to="/spreads">Spreads</RouterLink>
     </nav>
   </header>
 
@@ -28,6 +28,7 @@ header {
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--color-heading);
+  text-decoration: none;
 }
 
 nav {

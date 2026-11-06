@@ -1,13 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import SpreadsView from '../views/SpreadsView.vue'
+import HomeView from '../views/HomeView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
+      name: 'home',
+      component: HomeView,
+    },
+    {
+      path: '/spreads',
       name: 'spreads',
-      component: SpreadsView,
+      component: () => import('../views/SpreadsView.vue'),
     },
     {
       path: '/about',
