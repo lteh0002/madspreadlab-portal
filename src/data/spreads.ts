@@ -34,6 +34,16 @@ export function findSpread(name: string): SpreadInfo | undefined {
 export interface SpreadGroup {
   title: string
   spreads: SpreadInfo[]
+  /**
+   * Bar interval (minutes) every price chart in this group shows. The chart page offers
+   * only this interval and hides spreads without data at it. Omit to allow any interval.
+   */
+  chartInterval?: number
+  /**
+   * Trading days the chart opens on: T-`chartDays` … T-0, fitted to the width. Days older than
+   * T-`chartDays` are labelled "T-X". Zooming out still shows them. Omit for the page default.
+   */
+  chartDays?: number
 }
 
 export interface SpreadSection {
@@ -65,6 +75,8 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
     groups: [
       {
         title: 'Index Roll',
+        chartInterval: 15,
+        chartDays: 5,
         spreads: [
           {
             name: 'fair-value',
@@ -110,8 +122,9 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             name: 'roll-mca',
             label: 'MCA Roll',
             pageTitle: 'MCA Index Roll',
-            routeName: 'index-roll',
-            routeParams: { market: 'mca' },
+            // Opens the price chart from the database (price_data), not the index-roll placeholder
+            routeName: 'product-chart',
+            routeParams: { product: 'MCA' },
             description: 'MCA index roll',
             emoji: '🇨🇳',
             badge: 'MCA',

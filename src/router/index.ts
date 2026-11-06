@@ -27,6 +27,13 @@ const router = createRouter({
       props: true,
     },
     {
+      // Price chart from the database (price_data), e.g. /spreads/products/MCA
+      path: '/spreads/products/:product',
+      name: 'product-chart',
+      component: () => import('../views/ProductChartView.vue'),
+      props: true,
+    },
+    {
       path: '/spreads/:spreadName/chart',
       name: 'spread-chart',
       component: () => import('../views/SpreadChartView.vue'),
@@ -37,6 +44,12 @@ const router = createRouter({
       name: 'spread-detail',
       component: () => import('../views/SpreadDetailView.vue'),
       props: true,
+    },
+    {
+      // NOTE: not protected yet. Admin actions must be checked server-side once they exist.
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/AdminView.vue'),
     },
     {
       path: '/about',

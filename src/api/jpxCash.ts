@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './client'
+
 export interface JpxCashRecord {
   _id: string
   /** ISO timestamp, e.g. "2026-05-08T00:00:00.000Z" */
@@ -15,8 +17,6 @@ export interface JpxCashRecord {
 interface JpxCashResponse {
   data: JpxCashRecord[]
 }
-
-const API_BASE_URL = (import.meta.env.API_BASE_URL ?? '').replace(/\/$/, '')
 
 export interface JpxCashQuery {
   spreadName?: string

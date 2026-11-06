@@ -17,6 +17,7 @@ const NAV: NavItem[] = [
   { label: 'Analytics', icon: 'bars-solid' },
   { label: 'Watchlist', icon: 'star' },
   { label: 'Settings', icon: 'settings-solid' },
+  { label: 'Admin', icon: 'shield-solid', to: '/admin' },
 ]
 
 const route = useRoute()

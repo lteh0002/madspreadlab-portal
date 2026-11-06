@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, useId, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { UTC, tradingDayKey, type DisplayZone } from '@/utils/time'
 
 export interface LinePoint {
-  /** YYYY-MM-DD */
+  /** Daily: YYYY-MM-DD. Intraday: a full ISO timestamp (UTC), e.g. 2026-09-28T02:15:00.000Z */
   date: string
   value: number
 }
 
 /** The slice of `points` currently on screen */
 export interface ChartView {
-  /** First and last fully visible dates, YYYY-MM-DD */
+  /** First and last fully visible points' `date` (same format as LinePoint.date) */
   from: string
   to: string
   /** Number of points across the visible width */
@@ -18,6 +19,12 @@ export interface ChartView {
   atLatest: boolean
   /** Total points loaded */
   total: number
+  /** Indices of the first and last fully visible points */
+  first: number
+  last: number
+  /** With `relativeDays`: trading-day numbers of the first and last visible points (T-n → n) */
+  fromDay?: number
+  toDay?: number
 }
 
 const props = withDefaults(
@@ -32,8 +39,33 @@ const props = withDefaults(
     ariaLabel?: string
     loading?: boolean
     error?: string | null
+    /**
+     * Label time as trading days back from the last day instead of dates: the last day in the
+     * data is T-0, the day before it T-1, and so on. Days are the distinct calendar dates of
+     * `points` in `displayZone`.
+     */
+    relativeDays?: boolean
+    /** With `relativeDays`: days older than T-`maxLabelledDay` are all labelled "T-X" */
+    maxLabelledDay?: number | null
+    /**
+     * With `relativeDays`: hour (in `displayZone`) a trading day starts. 0 = midnight. Use e.g. 6
+     * so a night session running past midnight counts with the day it started.
+     */
+    dayStartHour?: number
+    /** Zone intraday times are shown in (and days split by), e.g. MYT. Plain dates are unaffected. */
+    displayZone?: DisplayZone
   }>(),
-  { initialCount: 65, valueLabel: 'Value', ariaLabel: 'Line chart', loading: false, error: null },
+  {
+    initialCount: 65,
+    valueLabel: 'Value',
+    ariaLabel: 'Line chart',
+    loading: false,
+    error: null,
+    relativeDays: false,
+    maxLabelledDay: null,
+    dayStartHour: 0,
+    displayZone: () => UTC,
+  },
 )
 
 const emit = defineEmits<{ retry: []; 'view-change': [view: ChartView] }>()
@@ -45,10 +77,25 @@ const H = 360
 const MIN_SPAN = 5
 /** Wheel zoom sensitivity per pixel of scroll */
 const ZOOM_SPEED = 0.002
+/** Horizontal room each rotated time label needs on a T-n axis */
+const TIME_LABEL_PX = 22
 
 const gradId = `line-area-${useId()}`
 const hover = ref<number | null>(null)
 const hitEl = ref<HTMLElement | null>(null)
+
+/** Plot width in CSS px, so rotated time labels can be spaced to never overlap */
+const plotEl = ref<HTMLElement | null>(null)
+const plotWidth = ref(800)
+let resizeObs: ResizeObserver | undefined
+onMounted(() => {
+  if (!plotEl.value || typeof ResizeObserver === 'undefined') return
+  resizeObs = new ResizeObserver(([entry]) => {
+    if (entry) plotWidth.value = entry.contentRect.width
+  })
+  resizeObs.observe(plotEl.value)
+})
+onBeforeUnmount(() => resizeObs?.disconnect())
 
 /**
  * Visible window in index units. Point i sits at x = (i - start) / (end - start).
@@ -56,30 +103,68 @@ const hitEl = ref<HTMLElement | null>(null)
  */
 const view = ref<{ start: number; end: number } | null>(null)
 
-const shortDate = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  timeZone: 'UTC',
-})
-const monthYear = new Intl.DateTimeFormat('en-GB', {
-  month: 'short',
-  year: '2-digit',
-  timeZone: 'UTC',
-})
-const longDate = new Intl.DateTimeFormat('en-GB', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
 const valueFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 const changeFmt = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
   signDisplay: 'exceptZero',
 })
-const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`)
+const DAY_MS = 86_400_000
+/**
+ * "2026-09-28" (daily) or an ISO timestamp (intraday). Timestamps from the database are UTC;
+ * one without a zone suffix is read as UTC too (browsers would otherwise take it as local time).
+ */
+const toDate = (iso: string) =>
+  new Date(
+    iso.length === 10 ? `${iso}T00:00:00Z` : /(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`,
+  )
+
+/** Points carry a time of day (e.g. 15-minute bars) rather than one value per date */
+const intraday = computed(() => (props.points[0]?.date.length ?? 0) > 10)
+
+/** Zone for intraday times; plain dates are calendar days already and are shown as such */
+const zone = computed(() => (intraday.value ? props.displayZone : UTC))
+const fmt = computed(() => {
+  const timeZone = zone.value.zone
+  return {
+    shortDate: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }),
+    monthYear: new Intl.DateTimeFormat('en-GB', { month: 'short', year: '2-digit', timeZone }),
+    longDate: new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone,
+    }),
+    timeOfDay: new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone,
+    }),
+  }
+})
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
+
+/**
+ * Per point: its trading day counted back from the last day (`t`, last day = 0) and whether it
+ * is the first point of its day (`dayStart`). Used when `relativeDays` is on.
+ */
+const days = computed(() => {
+  const keys = props.points.map((p) => tradingDayKey(p.date, zone.value.zone, props.dayStartHour))
+  const t = new Array<number>(keys.length)
+  const dayStart = new Array<boolean>(keys.length)
+  let n = 0
+  for (let i = keys.length - 1; i >= 0; i--) {
+    if (i < keys.length - 1 && keys[i] !== keys[i + 1]) n++
+    t[i] = n
+  }
+  for (let i = 0; i < keys.length; i++) dayStart[i] = i === 0 || keys[i] !== keys[i - 1]
+  return { t, dayStart }
+})
+/** "T-3", or "T-X" for days older than `maxLabelledDay` */
+const dayLabel = (t: number) =>
+  props.maxLabelledDay !== null && t > props.maxLabelledDay ? 'T-X' : `T-${t}`
+const tLabel = (i: number) => dayLabel(days.value.t[i]!)
 
 /** A 1/2/5 × 10^k step giving about `count` intervals */
 function niceStep(span: number, count: number) {
@@ -111,6 +196,9 @@ function setView(start: number, span: number) {
     count: Math.round(span),
     atLatest: start + span >= n - 0.51,
     total: n,
+    first,
+    last,
+    ...(props.relativeDays && { fromDay: days.value.t[first], toDay: days.value.t[last] }),
   })
 }
 
@@ -118,6 +206,15 @@ function setView(start: number, span: number) {
 function showLatest(count: number) {
   const span = clampSpan(count)
   setView(props.points.length - 0.5 - span, span)
+}
+
+/**
+ * Fit points `first` … `last` (indices, inclusive) to the width, e.g. one trading day.
+ * A range shorter than the minimum zoom is centred instead.
+ */
+function showRange(first: number, last: number) {
+  const span = clampSpan(last - first + 1)
+  setView((first + last) / 2 - span / 2, span)
 }
 
 const span = () => (view.value ? view.value.end - view.value.start : props.initialCount)
@@ -147,7 +244,7 @@ watch(
   { immediate: true },
 )
 
-defineExpose({ showLatest })
+defineExpose({ showLatest, showRange })
 
 /* ---------- Geometry for the visible window ---------- */
 
@@ -187,14 +284,66 @@ const chart = computed(() => {
 
   // Date ticks sit on fixed index multiples so they glide with the data while panning
   const every = Math.max(1, Math.round(niceStep(width, 6)))
-  const dateFmt = width > 200 ? monthYear : shortDate
   const xTicks: { key: number; label: string; left: string }[] = []
-  for (
-    let i = Math.ceil(Math.max(v.start, 0) / every) * every;
-    i <= Math.min(v.end, n - 1);
-    i += every
-  )
-    xTicks.push({ key: i, label: dateFmt.format(toDate(pts[i]!.date)), left: pct(x(i), W) })
+  const firstVisible = Math.ceil(Math.max(v.start, 0))
+  const lastVisible = Math.floor(Math.min(v.end, n - 1))
+  const { t, dayStart } = days.value
+
+  // Days older than T-maxLabelledDay ("T-X") get no separators or axis labels, only the line
+  const labelled = (i: number) => props.maxLabelledDay === null || t[i]! <= props.maxLabelledDay
+
+  // Day separators: a vertical line where each labelled trading day starts, halfway between the
+  // previous day's last bar and this day's first bar (the very first bar has nothing before it)
+  let daySeparators = ''
+  if (props.relativeDays)
+    for (let i = Math.max(1, firstVisible); i <= Math.min(lastVisible + 1, n - 1); i++)
+      if (dayStart[i] && labelled(i)) daySeparators += `M${x(i - 0.5).toFixed(1)} 0 V${H} `
+
+  // T-n charts get a two-level axis (like Excel's grouped category axis): row 1 is each bar's
+  // time, rotated; row 2 is the trading day, centred under its visible bars; dividers between days
+  const timeTicks: { key: number; label: string; left: string }[] = []
+  const dayLabels: { key: number; label: string; left: string }[] = []
+  const axisSeps: { key: number; left: string }[] = []
+  if (props.relativeDays) {
+    if (intraday.value) {
+      // Every k-th bar, k sized to the plot's pixel width; fixed index multiples so labels glide
+      const k = Math.max(1, Math.ceil((width * TIME_LABEL_PX) / Math.max(plotWidth.value, 1)))
+      for (let i = Math.ceil(firstVisible / k) * k; i <= lastVisible; i += k)
+        if (labelled(i))
+          timeTicks.push({
+            key: i,
+            label: fmt.value.timeOfDay.format(toDate(pts[i]!.date)),
+            left: pct(x(i), W),
+          })
+    }
+    let dayFirst = firstVisible
+    for (let i = firstVisible; i <= lastVisible; i++) {
+      if (i < lastVisible && !dayStart[i + 1]) continue // not the day's last visible bar
+      if (labelled(i))
+        dayLabels.push({ key: t[i]!, label: tLabel(i), left: pct(x((dayFirst + i) / 2), W) })
+      dayFirst = i + 1
+    }
+    for (let i = Math.max(1, firstVisible); i <= Math.min(lastVisible + 1, n - 1); i++)
+      if (dayStart[i] && labelled(i)) axisSeps.push({ key: i, left: pct(x(i - 0.5), W) })
+  }
+
+  let tickLabel: (d: Date) => string
+  if (intraday.value) {
+    // Pick the label by how much time is on screen: days → "28 Sep", one or two days → "28 Sep 14:00", hours → "14:00"
+    const visibleMs = toDate(pts[i1]!.date).getTime() - toDate(pts[i0]!.date).getTime()
+    tickLabel =
+      visibleMs > 3 * DAY_MS
+        ? (d) => fmt.value.shortDate.format(d)
+        : visibleMs > DAY_MS
+          ? (d) => `${fmt.value.shortDate.format(d)} ${fmt.value.timeOfDay.format(d)}`
+          : (d) => fmt.value.timeOfDay.format(d)
+  } else {
+    const dayFmt = width > 200 ? fmt.value.monthYear : fmt.value.shortDate
+    tickLabel = (d) => dayFmt.format(d)
+  }
+  if (!props.relativeDays)
+    for (let i = Math.ceil(Math.max(v.start, 0) / every) * every; i <= lastVisible; i += every)
+      xTicks.push({ key: i, label: tickLabel(toDate(pts[i]!.date)), left: pct(x(i), W) })
 
   let line = ''
   for (let i = i0; i <= i1; i++)
@@ -205,6 +354,10 @@ const chart = computed(() => {
   return {
     n,
     grid,
+    daySeparators,
+    timeTicks,
+    dayLabels,
+    axisSeps,
     line,
     area,
     yTicks,
@@ -223,10 +376,17 @@ const tip = computed(() => {
   const p = props.points[i]!
   const prev = props.points[i - 1]
   const pos = c.at(i)
+  const d = toDate(p.date)
+  // The bar's own calendar date (and time, for intraday) in the display zone
+  const when = intraday.value
+    ? `${fmt.value.longDate.format(d)} · ${fmt.value.timeOfDay.format(d)} ${zone.value.label}`
+    : fmt.value.longDate.format(d)
   return {
     ...pos,
     flip: pos.fx > 0.6,
-    date: longDate.format(toDate(p.date)),
+    // With T-n labels: the trading day as the heading, the actual date and time beneath it
+    date: props.relativeDays ? tLabel(i) : when,
+    when: props.relativeDays ? when : '',
     value: valueFmt.format(p.value),
     change: prev ? changeFmt.format(p.value - prev.value) : '—',
   }
@@ -306,8 +466,8 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="chart" :aria-busy="loading">
-    <div class="plot">
+  <div class="chart" :class="{ grouped: relativeDays }" :aria-busy="loading">
+    <div ref="plotEl" class="plot">
       <template v-if="chart">
         <span v-for="t in chart.yTicks" :key="t.label" class="y-tick" :style="{ top: t.top }">
           {{ t.label }}
@@ -316,6 +476,29 @@ function onKeydown(e: KeyboardEvent) {
           <span v-for="t in chart.xTicks" :key="t.key" class="x-tick" :style="{ left: t.left }">
             {{ t.label }}
           </span>
+          <!-- T-n charts: rotated times, then trading days, with dividers through both rows -->
+          <span
+            v-for="tk in chart.timeTicks"
+            :key="`time-${tk.key}`"
+            class="x-time"
+            :style="{ left: tk.left }"
+          >
+            {{ tk.label }}
+          </span>
+          <span
+            v-for="d in chart.dayLabels"
+            :key="`day-${d.key}`"
+            class="x-day"
+            :style="{ left: d.left }"
+          >
+            {{ d.label }}
+          </span>
+          <span
+            v-for="sep in chart.axisSeps"
+            :key="`sep-${sep.key}`"
+            class="x-sep"
+            :style="{ left: sep.left }"
+          />
         </div>
         <span class="last-tag" :style="{ top: chart.lastTag.top }">{{ chart.lastTag.label }}</span>
 
@@ -333,6 +516,7 @@ function onKeydown(e: KeyboardEvent) {
             </linearGradient>
           </defs>
           <path class="grid" :d="chart.grid" />
+          <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
           <path :d="chart.area" :fill="`url(#${gradId})`" />
           <path class="line" :d="chart.line" />
         </svg>
@@ -356,12 +540,14 @@ function onKeydown(e: KeyboardEvent) {
             <div class="dot" :style="{ left: tip.left, top: tip.top }" />
             <div class="tooltip" :class="{ flip: tip.flip }" :style="{ left: tip.left }">
               <span class="tip-date">{{ tip.date }}</span>
+              <span v-if="tip.when" class="tip-when">{{ tip.when }}</span>
               <span class="tip-row">
                 <span>{{ valueLabel }}</span
                 ><strong>{{ tip.value }}</strong>
               </span>
               <span class="tip-row muted">
-                <span>Day change</span><span>{{ tip.change }}</span>
+                <span>{{ intraday ? 'Change' : 'Day change' }}</span
+                ><span>{{ tip.change }}</span>
               </span>
             </div>
           </template>
@@ -396,6 +582,10 @@ function onKeydown(e: KeyboardEvent) {
   /* gutters: y-axis labels left, latest-value tag right, date labels below */
   padding: 0.5rem 4rem 1.75rem 3rem;
 }
+/* Room for the two-level T-n axis: rotated times, then the trading day */
+.chart.grouped {
+  padding-bottom: 5.5rem;
+}
 
 .plot {
   position: relative;
@@ -415,6 +605,14 @@ function onKeydown(e: KeyboardEvent) {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+.day-sep {
+  fill: none;
+  stroke: var(--color-border-hover);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
 }
 
 .grid {
@@ -449,6 +647,36 @@ function onKeydown(e: KeyboardEvent) {
 .x-tick {
   top: calc(100% + 0.5rem);
   transform: translateX(-50%);
+}
+
+/* Two-level T-n axis */
+.x-time,
+.x-day {
+  position: absolute;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.x-time {
+  top: calc(100% + 0.45rem);
+  font-size: 0.72rem;
+  line-height: 1;
+  /* vertical, reading bottom-to-top like a spreadsheet axis */
+  writing-mode: vertical-rl;
+  transform: translateX(-50%) rotate(180deg);
+}
+.x-day {
+  top: calc(100% + 3.65rem);
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.x-sep {
+  position: absolute;
+  top: 100%;
+  height: 5.25rem;
+  border-left: 1px dashed var(--color-border-hover);
 }
 .last-tag {
   left: calc(100% + 0.6rem);
@@ -545,6 +773,12 @@ function onKeydown(e: KeyboardEvent) {
 }
 .tooltip.flip {
   transform: translateX(calc(-100% - 14px));
+}
+.tip-when {
+  margin-top: -0.15rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 .tip-date {
   font-weight: 600;
