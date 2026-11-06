@@ -20,6 +20,19 @@ const router = createRouter({
       component: () => import('../views/FairValueView.vue'),
     },
     {
+      // static /spreads/index-roll/fair-value above takes precedence over this
+      path: '/spreads/index-roll/:market',
+      name: 'index-roll',
+      component: () => import('../views/IndexRollView.vue'),
+      props: true,
+    },
+    {
+      path: '/spreads/:spreadName/chart',
+      name: 'spread-chart',
+      component: () => import('../views/SpreadChartView.vue'),
+      props: true,
+    },
+    {
       path: '/spreads/:spreadName',
       name: 'spread-detail',
       component: () => import('../views/SpreadDetailView.vue'),

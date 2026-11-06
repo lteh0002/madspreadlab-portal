@@ -25,9 +25,10 @@ const toInput = ref('')
 let controller: AbortController | undefined
 let retryTimer: ReturnType<typeof setInterval> | undefined
 
-const title = computed(
-  () => `${findSpread(props.spreadName)?.label ?? props.spreadName} Cash Values`,
-)
+const title = computed(() => {
+  const spread = findSpread(props.spreadName)
+  return spread?.pageTitle ?? `${spread?.label ?? props.spreadName} Cash Values`
+})
 
 const errorHint = computed(() =>
   retryIn.value > 0 ? `Retrying in ${retryIn.value}s…` : 'Retrying…',

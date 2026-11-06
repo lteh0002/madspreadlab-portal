@@ -6,6 +6,19 @@ export interface SpreadInfo {
   description?: string
   /** Route name to open instead of the default cash table page (spread-detail) */
   routeName?: string
+  /** Params for `routeName`, e.g. { spreadName: '1x6' } */
+  routeParams?: Record<string, string>
+  /** Heading on the spread's own page; defaults to "<label> Cash Values" */
+  pageTitle?: string
+  /**
+   * Emoji shown in the card's icon tile, e.g. a country flag "🇯🇵". Takes precedence over
+   * `badge`, except on devices that can't draw flag emoji (e.g. Windows), where `badge` is shown.
+   */
+  emoji?: string
+  /** Short text shown in the card's icon tile, e.g. "JPX"; omit both to show a trend icon */
+  badge?: string
+  /** Extra tags shown on the card (the section title is always shown first) */
+  tags?: string[]
 }
 
 /** Find a spread by its `name` (the URL segment) */
@@ -25,6 +38,10 @@ export interface SpreadGroup {
 
 export interface SpreadSection {
   title: string
+  /** Icon shown beside the section heading */
+  icon: 'database' | 'trend'
+  /** Text for the empty state when the section has no spreads yet */
+  emptyText?: string
   /** Sub-groups within the section; a section with no sub-split has a single untitled group */
   groups: SpreadGroup[]
 }
@@ -32,14 +49,19 @@ export interface SpreadSection {
 /**
  * Layout of the /spreads landing page.
  * To add a button, add a spread to the relevant group's `spreads` list.
+ * Each titled group is shown as its own category (sub-heading + cards) within its section;
+ * to add a category, add a group.
  */
 export const SPREAD_SECTIONS: SpreadSection[] = [
   {
     title: 'Commodities',
+    icon: 'database',
+    emptyText: 'Commodity spreads are currently being developed.',
     groups: [{ title: '', spreads: [] }],
   },
   {
     title: 'Indices',
+    icon: 'trend',
     groups: [
       {
         title: 'Index Roll',
@@ -48,13 +70,88 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             name: 'fair-value',
             label: 'Fair Value',
             routeName: 'fair-value',
-            description: 'Historical FV for Indices'
+            description: 'Historical fair value for indices',
+            tags: ['Analytics'],
+          },
+          {
+            name: 'roll-sgp',
+            label: 'SGP Roll',
+            pageTitle: 'SGP Index Roll',
+            routeName: 'index-roll',
+            routeParams: { market: 'sgp' },
+            description: 'Singapore index roll',
+            emoji: '🇸🇬',
+            badge: 'SGP',
+            tags: ['Singapore'],
+          },
+          {
+            name: 'roll-twn',
+            label: 'TWN Roll',
+            pageTitle: 'TWN Index Roll',
+            routeName: 'index-roll',
+            routeParams: { market: 'twn' },
+            description: 'Taiwan index roll',
+            emoji: '🇹🇼',
+            badge: 'TWN',
+            tags: ['Taiwan'],
+          },
+          {
+            name: 'roll-fkli',
+            label: 'FKLI Roll',
+            pageTitle: 'FKLI Index Roll',
+            routeName: 'index-roll',
+            routeParams: { market: 'fkli' },
+            description: 'FBM KLCI index roll',
+            emoji: '🇲🇾',
+            badge: 'FKLI',
+            tags: ['Malaysia'],
           },
         ],
       },
       {
-        title: 'Indices Cash',
-        spreads: [{ name: '1x6', label: 'JPX 1x6', description: '10:30 & 14:30 sessions' }],
+        title: 'JPX',
+        spreads: [
+          {
+            name: '1x6',
+            label: '1×6 Cash',
+            pageTitle: 'JPX 1×6 Cash Values',
+            description: '10:30 & 14:30 sessions cash value',
+            emoji: '🇯🇵',
+            badge: 'JPX',
+            tags: ['Japan', 'Cash'],
+          },
+          {
+            name: '1x11',
+            label: '1×11 Cash',
+            pageTitle: 'JPX 1×11 Cash Values',
+            description: '10:30 & 14:30 sessions cash value',
+            emoji: '🇯🇵',
+            badge: 'JPX',
+            tags: ['Japan', 'Cash'],
+          },
+          {
+            name: '1x6-chart',
+            label: '1×6 Chart',
+            pageTitle: 'JPX 1×6 Chart',
+            routeName: 'spread-chart',
+            routeParams: { spreadName: '1x6' },
+            description: 'Historical 1×6 spread chart',
+            emoji: '🇯🇵',
+            badge: 'JPX',
+            tags: ['Japan', 'Chart'],
+          },
+          {
+            name: '1x11-chart',
+            label: '1×11 Chart',
+            pageTitle: 'JPX 1×11 Chart',
+            routeName: 'spread-chart',
+            routeParams: { spreadName: '1x11' },
+            description: 'Historical 1×11 spread chart',
+            emoji: '🇯🇵',
+            badge: 'JPX',
+            tags: ['Japan', 'Chart'],
+          },
+        ],
       },
     ],
   },
