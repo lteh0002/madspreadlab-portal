@@ -15,6 +15,12 @@ const router = createRouter({
       component: () => import('../views/SpreadsView.vue'),
     },
     {
+      path: '/spreads/:spreadName',
+      name: 'spread-detail',
+      component: () => import('../views/SpreadDetailView.vue'),
+      props: true,
+    },
+    {
       path: '/about',
       name: 'about',
       // route level code-splitting
