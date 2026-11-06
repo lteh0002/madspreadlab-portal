@@ -15,6 +15,11 @@ const router = createRouter({
       component: () => import('../views/SpreadsView.vue'),
     },
     {
+      path: '/spreads/index-roll/fair-value',
+      name: 'fair-value',
+      component: () => import('../views/FairValueView.vue'),
+    },
+    {
       path: '/spreads/:spreadName',
       name: 'spread-detail',
       component: () => import('../views/SpreadDetailView.vue'),

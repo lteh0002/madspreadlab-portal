@@ -17,7 +17,11 @@ import { SPREAD_SECTIONS } from '@/data/spreads'
           <RouterLink
             v-for="s in group.spreads"
             :key="s.name"
-            :to="{ name: 'spread-detail', params: { spreadName: s.name } }"
+            :to="
+              s.routeName
+                ? { name: s.routeName }
+                : { name: 'spread-detail', params: { spreadName: s.name } }
+            "
             class="card"
           >
             <span class="card-title">{{ s.label ?? s.name }}</span>

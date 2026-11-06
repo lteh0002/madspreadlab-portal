@@ -4,6 +4,8 @@ export interface SpreadInfo {
   /** Text shown on the button and page title; defaults to `name` */
   label?: string
   description?: string
+  /** Route name to open instead of the default cash table page (spread-detail) */
+  routeName?: string
 }
 
 /** Find a spread by its `name` (the URL segment) */
@@ -39,7 +41,17 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
   {
     title: 'Indices',
     groups: [
-      { title: 'Index Roll', spreads: [] },
+      {
+        title: 'Index Roll',
+        spreads: [
+          {
+            name: 'fair-value',
+            label: 'Fair Value',
+            routeName: 'fair-value',
+            description: 'Historical FV for Indices'
+          },
+        ],
+      },
       {
         title: 'Indices Cash',
         spreads: [{ name: '1x6', label: 'JPX 1x6', description: '10:30 & 14:30 sessions' }],
