@@ -89,8 +89,9 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             name: 'roll-sgp',
             label: 'SGP Roll',
             pageTitle: 'SGP Index Roll',
-            routeName: 'index-roll',
-            routeParams: { market: 'sgp' },
+            // Opens the price chart from the database (price_data), like MCA
+            routeName: 'product-chart',
+            routeParams: { product: 'SGP' },
             description: 'Singapore index roll',
             emoji: '🇸🇬',
             badge: 'SGP',
@@ -100,8 +101,9 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             name: 'roll-twn',
             label: 'TWN Roll',
             pageTitle: 'TWN Index Roll',
-            routeName: 'index-roll',
-            routeParams: { market: 'twn' },
+            // Opens the price chart from the database (price_data), like MCA
+            routeName: 'product-chart',
+            routeParams: { product: 'TWN' },
             description: 'Taiwan index roll',
             emoji: '🇹🇼',
             badge: 'TWN',
