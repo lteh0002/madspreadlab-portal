@@ -451,15 +451,15 @@ function onSearchKeydown(e: KeyboardEvent) {
   padding: 1.5rem 0 2.25rem;
 }
 h1 {
-  font-size: clamp(2.6rem, 5vw, 4.25rem);
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.03em;
   color: var(--color-heading);
 }
 .subtitle {
-  margin-top: 0.75rem;
-  font-size: 1.25rem;
+  margin-top: 0.6rem;
+  font-size: 1rem;
   color: var(--color-text);
 }
 
@@ -504,7 +504,7 @@ h1 {
   background: transparent;
   color: var(--color-heading);
   font: inherit;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
 }
 .search input::placeholder {
   color: var(--color-text-muted);
@@ -542,7 +542,7 @@ h1 {
   backdrop-filter: blur(8px);
   color: var(--color-heading);
   font: inherit;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
   transition: border-color 0.2s;
@@ -670,7 +670,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 1.1rem;
-  font-size: 1.95rem;
+  font-size: 1.4rem;
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--color-heading);
@@ -688,7 +688,7 @@ h2 {
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 1.05rem;
+  font-size: 0.85rem;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -797,7 +797,7 @@ h2 {
   margin-bottom: 1rem;
 }
 h3 {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -814,7 +814,7 @@ h3 {
   background: var(--color-accent-soft);
   border: 1px solid var(--color-accent-border);
   color: var(--color-accent-strong);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -877,12 +877,12 @@ h3 {
   color: #fff;
 }
 .tile.text {
-  font-size: 1.6rem;
+  font-size: 1.3rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 .tile.emoji {
-  font-size: 3.1rem;
+  font-size: 2.6rem;
   line-height: 1;
   /* flag emoji are full-colour; keep the font stack emoji-capable */
   font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
@@ -894,13 +894,13 @@ h3 {
   padding-top: 0.5rem;
 }
 .card-title {
-  font-size: 1.6rem;
+  font-size: 1.2rem;
   font-weight: 600;
   line-height: 1.2;
   color: var(--color-heading);
 }
 .card-desc {
-  font-size: 1.05rem;
+  font-size: 0.875rem;
   color: var(--color-text);
 }
 .card-spark {
@@ -924,13 +924,13 @@ h3 {
   gap: 1rem;
 }
 .tag {
-  padding: 0.4rem 1.1rem;
+  padding: 0.3rem 0.85rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-heading) 9%, transparent);
   color: var(--color-heading);
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .tag.primary {
@@ -976,11 +976,11 @@ h3 {
 .empty strong {
   color: var(--color-heading);
   font-weight: 600;
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
 .empty span {
   color: var(--color-text);
-  font-size: 1.05rem;
+  font-size: 0.875rem;
 }
 
 .no-results {
@@ -1018,7 +1018,7 @@ h3 {
     padding-top: 1rem;
   }
   .subtitle {
-    font-size: 1rem;
+    font-size: 0.875rem;
   }
   .toolbar {
     gap: 0.75rem;
@@ -1041,14 +1041,14 @@ h3 {
   }
   h2 {
     gap: 0.75rem;
-    font-size: 1.45rem;
+    font-size: 1.2rem;
   }
   .section-icon {
     width: 28px;
     height: 28px;
   }
   .section-link {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
   }
   .card-top {
     grid-template-columns: auto minmax(0, 1fr);
@@ -1063,13 +1063,13 @@ h3 {
     height: 60px;
   }
   .tile.text {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
   }
   .tile.emoji {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
   }
   .card-title {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
   }
   .tags {
     gap: 0.5rem;
