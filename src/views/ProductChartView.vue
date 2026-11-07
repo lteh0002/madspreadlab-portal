@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BackLink from '@/components/BackLink.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
@@ -383,7 +384,7 @@ onUnmounted(() => spreadsCtl?.abort())
 
 <template>
   <main ref="pageEl">
-    <RouterLink to="/spreads" class="back">← All spreads</RouterLink>
+    <BackLink to="/spreads">All spreads</BackLink>
     <h1>{{ title }}</h1>
     <p class="crumb">
       <template v-if="card">{{ card.path }} · </template>
@@ -588,12 +589,6 @@ onUnmounted(() => spreadsCtl?.abort())
 </template>
 
 <style scoped>
-.back {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
 h1 {
   font-size: 1.6rem;
   font-weight: 600;

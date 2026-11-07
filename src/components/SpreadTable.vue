@@ -74,7 +74,7 @@ const showSkeleton = computed(() => props.loading || !!props.error)
       <div class="overlay-box">
         <p class="overlay-title">{{ error }}</p>
         <p v-if="errorHint" class="overlay-hint">{{ errorHint }}</p>
-        <button type="button" class="retry" @click="$emit('retry')">Retry now</button>
+        <button type="button" class="btn sm retry" @click="$emit('retry')">Retry now</button>
       </div>
     </div>
     <span v-if="loading" class="sr-only" role="status">Loading data…</span>
@@ -213,18 +213,6 @@ tbody:not(.skeleton) tr:hover {
 
 .retry {
   margin-top: 0.75rem;
-  padding: 0.4rem 0.9rem;
-  font: inherit;
-  font-size: 0.9rem;
-  border: 1px solid hsla(160, 100%, 37%, 1);
-  border-radius: 6px;
-  background: transparent;
-  color: hsla(160, 100%, 37%, 1);
-  cursor: pointer;
-}
-
-.retry:hover {
-  background: hsla(160, 100%, 37%, 0.12);
 }
 
 .sr-only {

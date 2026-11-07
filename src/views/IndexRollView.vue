@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import BackLink from '@/components/BackLink.vue'
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
 import { findSpread } from '@/data/spreads'
 
 const props = defineProps<{ market: string }>()
@@ -12,7 +12,7 @@ const title = computed(
 
 <template>
   <main>
-    <RouterLink to="/spreads" class="back">← All spreads</RouterLink>
+    <BackLink to="/spreads">All spreads</BackLink>
     <h1>{{ title }}</h1>
     <p class="crumb">Indices · Index Roll</p>
     <div class="placeholder">Coming soon</div>
@@ -20,12 +20,6 @@ const title = computed(
 </template>
 
 <style scoped>
-.back {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
 h1 {
   font-size: 1.6rem;
   font-weight: 600;

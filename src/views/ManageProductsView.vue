@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import BackLink from '@/components/BackLink.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { RouterLink, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import {
   fetchManagedProducts,
@@ -279,7 +280,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 <template>
   <main>
-    <RouterLink to="/admin" class="back">← Admin</RouterLink>
+    <BackLink to="/admin">Admin</BackLink>
     <h1>Manage indices spreads</h1>
     <p class="crumb">
       Type a spread's fair value and press Update to save it. Empty the field and press Clear to
@@ -290,7 +291,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
       <div v-if="error" role="alert">
         <p class="state-title">{{ error }}</p>
         <p class="state-hint">{{ errorHint }}</p>
-        <button type="button" class="retry" @click="load">Retry now</button>
+        <button type="button" class="btn sm retry" @click="load">Retry now</button>
       </div>
       <template v-else>
         <span v-for="i in 3" :key="i" class="bar" aria-hidden="true" />
@@ -443,12 +444,6 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 </template>
 
 <style scoped>
-.back {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
 h1 {
   font-size: 1.6rem;
   font-weight: 600;
@@ -860,18 +855,6 @@ input.invalid {
 
 .retry {
   margin-top: 0.75rem;
-  padding: 0.4rem 0.9rem;
-  font: inherit;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-accent-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-accent);
-  cursor: pointer;
-}
-
-.retry:hover {
-  background: var(--color-accent-soft);
 }
 
 .bar {

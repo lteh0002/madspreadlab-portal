@@ -269,37 +269,6 @@ h2 {
   padding: 1rem 1.5rem 1.25rem;
   border-top: 1px solid var(--color-border);
 }
-.app-dialog .btn {
-  min-height: 42px;
-  padding: 0.5rem 1.1rem;
-  font: inherit;
-  font-size: 0.95rem;
-  font-weight: 500;
-  border: 1px solid var(--color-border-hover);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-heading);
-  cursor: pointer;
-}
-.app-dialog .btn:hover:not(:disabled) {
-  background: var(--color-background-mute);
-}
-.app-dialog .btn.primary {
-  border-color: transparent;
-  background: var(--color-accent-solid);
-  color: var(--color-on-accent);
-}
-.app-dialog .btn.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent-solid) 85%, #000);
-}
-.app-dialog .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.app-dialog .btn:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
 
 /* Success screen */
 .app-dialog .done {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import BackLink from '@/components/BackLink.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import SpreadTable, { type DailyCashRow } from '@/components/SpreadTable.vue'
 import { fetchJpxCash, type JpxCashQuery, type JpxCashRecord } from '@/api/jpxCash'
 import { findSpread } from '@/data/spreads'
@@ -131,7 +131,7 @@ onUnmounted(() => {
 
 <template>
   <main>
-    <RouterLink to="/spreads" class="back">← All spreads</RouterLink>
+    <BackLink to="/spreads">All spreads</BackLink>
     <h1>{{ title }}</h1>
 
     <form class="filters" @submit.prevent="applyRange">
@@ -162,12 +162,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.back {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
 h1 {
   font-size: 1.6rem;
   font-weight: 600;
@@ -200,35 +194,6 @@ input[type='date'] {
   border: 1px solid var(--color-border);
   border-radius: 6px;
   color-scheme: light dark;
-}
-
-.btn {
-  padding: 0.4rem 0.9rem;
-  font: inherit;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.btn:hover:not(:disabled) {
-  background: var(--color-background-mute);
-}
-
-.btn.primary {
-  border-color: hsla(160, 100%, 37%, 1);
-  color: hsla(160, 100%, 37%, 1);
-}
-
-.btn.primary:hover:not(:disabled) {
-  background: hsla(160, 100%, 37%, 0.12);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .summary {

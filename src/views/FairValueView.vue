@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import BackLink from '@/components/BackLink.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { fetchFairValues, type ProductFairValues } from '@/api/fairValue'
 import { useAutoRetry } from '@/composables/useAutoRetry'
@@ -268,7 +269,7 @@ const tables = computed<Table[]>(() => {
 
 <template>
   <main>
-    <RouterLink to="/spreads" class="back">← All spreads</RouterLink>
+    <BackLink to="/spreads">All spreads</BackLink>
     <h1>Fair Value</h1>
     <p class="crumb">Indices · Index Roll</p>
 
@@ -277,7 +278,7 @@ const tables = computed<Table[]>(() => {
         <div role="alert">
           <p class="state-title">{{ error }}</p>
           <p class="state-hint">{{ errorHint }}</p>
-          <button type="button" class="retry" @click="load">Retry now</button>
+          <button type="button" class="btn sm retry" @click="load">Retry now</button>
         </div>
       </template>
       <template v-else>
@@ -365,12 +366,6 @@ const tables = computed<Table[]>(() => {
 </template>
 
 <style scoped>
-.back {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
 h1 {
   font-size: 1.6rem;
   font-weight: 600;
@@ -603,18 +598,6 @@ code {
 
 .retry {
   margin-top: 0.75rem;
-  padding: 0.4rem 0.9rem;
-  font: inherit;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-accent-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-accent);
-  cursor: pointer;
-}
-
-.retry:hover {
-  background: var(--color-accent-soft);
 }
 
 .bar {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import BackLink from '@/components/BackLink.vue'
 import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import LineChart, { type ChartView, type LinePoint } from '@/components/LineChart.vue'
 import { fetchSpreadCloses } from '@/api/spreadChart'
 import { findSpread } from '@/data/spreads'
@@ -71,7 +71,7 @@ onUnmounted(() => controller?.abort())
 
 <template>
   <main>
-    <RouterLink to="/spreads" class="back">← All spreads</RouterLink>
+    <BackLink to="/spreads">All spreads</BackLink>
     <h1>{{ title }}</h1>
     <p class="crumb">Indices · JPX <span class="badge">Placeholder data</span></p>
 
@@ -112,12 +112,6 @@ onUnmounted(() => controller?.abort())
 </template>
 
 <style scoped>
-.back {
-  display: inline-block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
 h1 {
   font-size: 1.6rem;
   font-weight: 600;

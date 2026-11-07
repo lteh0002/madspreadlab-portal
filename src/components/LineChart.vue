@@ -872,7 +872,7 @@ function onKeydown(e: KeyboardEvent) {
         <span class="state-card column">
           <span class="state-title">{{ error }}</span>
           <span v-if="errorHint" class="state-hint">{{ errorHint }}</span>
-          <button type="button" class="retry" @click="$emit('retry')">Retry</button>
+          <button type="button" class="btn sm retry" @click="$emit('retry')">Retry</button>
         </span>
       </div>
       <div v-else-if="!chart" class="state" role="status">
@@ -1295,17 +1295,6 @@ function onKeydown(e: KeyboardEvent) {
   .stage {
     transition: none;
   }
-}
-
-.retry {
-  padding: 0.35rem 0.9rem;
-  font: inherit;
-  font-size: 0.85rem;
-  border: 1px solid var(--color-border-hover);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
 }
 
 @media (max-width: 600px) {
