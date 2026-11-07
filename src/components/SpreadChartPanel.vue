@@ -30,6 +30,8 @@ const props = defineProps<{
   height: number
   /** Crosshair key hovered on any chart on the page ("T-2 10:45"), to line this one up */
   hoverKey: string | null
+  /** Draw this spread's fair value on the chart (when it has one) */
+  showFairValue: boolean
   /** Interval fixed by the Spreads-page group (for the empty message); null = any */
   fixedInterval: number | null
 }>()
@@ -58,8 +60,13 @@ const truncated = ref(false)
 const view = ref<ChartView | null>(null)
 
 const spreadLabel = computed(() => `${props.spread.front}–${props.spread.back}`)
-const optionLabel = (s: ProductSpread, i: number) =>
-  `${s.front}–${s.back} (${s.spreadName})${i === 0 ? ' · latest' : ''}`
+const fairValueFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 })
+/** "FV 12.5", or '' when this spread has no fair value */
+const fairValue = computed(() => {
+  const v = props.spread.fairValue
+  return typeof v === 'number' && Number.isFinite(v) ? fairValueFmt.format(v) : ''
+})
+const optionLabel = (s: ProductSpread) => `${s.front}–${s.back}`
 function onSelect(e: Event) {
   emit('select', (e.target as HTMLSelectElement).value)
 }
@@ -187,16 +194,17 @@ const period = computed(() => {
     <header class="panel-head">
       <span v-if="options && options.length > 1" class="select-wrap">
         <select :value="spread.id" aria-label="Contract months" @change="onSelect">
-          <option v-for="(s, i) in options" :key="s.id" :value="s.id">
-            {{ optionLabel(s, i) }}
+          <option v-for="s in options" :key="s.id" :value="s.id">
+            {{ optionLabel(s) }}
           </option>
         </select>
         <AppIcon name="chevron-down" :size="16" class="select-chev" />
       </span>
-      <template v-else>
-        <h2 class="panel-title">{{ spreadLabel }}</h2>
-        <span class="panel-code">{{ spread.spreadName }}</span>
-      </template>
+      <h2 v-else class="panel-title">{{ spreadLabel }}</h2>
+      <span class="panel-code">{{ spread.spreadName }}</span>
+      <span v-if="fairValue" class="fair-value" :title="`Fair value: ${fairValue}`">
+        FV <strong>{{ fairValue }}</strong>
+      </span>
     </header>
 
     <p class="period">
@@ -220,6 +228,8 @@ const period = computed(() => {
       :error="error"
       :error-hint="errorHint"
       :sync-key="hoverKey"
+      :ref-value="showFairValue ? spread.fairValue : null"
+      ref-label="FV"
       @hover-key="emit('hover-key', $event)"
       @view-change="view = $event"
       @retry="loadBars"
@@ -285,6 +295,23 @@ select:focus-visible {
 }
 .panel-title {
   font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+.fair-value {
+  flex: none;
+  align-self: center;
+  /* pushed to the card's top-right corner */
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--color-border-hover);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.fair-value strong {
   font-weight: 600;
   color: var(--color-heading);
 }

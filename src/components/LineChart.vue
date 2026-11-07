@@ -71,6 +71,10 @@ const props = withDefaults(
      * crosshair on its own point with the same key, if it has one on screen.
      */
     syncKey?: string | null
+    /** A reference level drawn as a dashed horizontal line (e.g. fair value); null = none */
+    refValue?: number | null
+    /** Label before the reference value, e.g. "FV" */
+    refLabel?: string
   }>(),
   {
     initialCount: 65,
@@ -87,6 +91,8 @@ const props = withDefaults(
     displayZone: () => UTC,
     height: 360,
     syncKey: null,
+    refValue: null,
+    refLabel: '',
   },
 )
 
@@ -218,6 +224,11 @@ const days = computed(() => {
 const dayLabel = (t: number) =>
   props.maxLabelledDay !== null && t > props.maxLabelledDay ? 'T-X' : `T-${t}`
 const tLabel = (i: number) => dayLabel(days.value.t[i]!)
+
+/** The reference level, when set to a real number */
+const refLevel = computed(() =>
+  typeof props.refValue === 'number' && Number.isFinite(props.refValue) ? props.refValue : null,
+)
 
 /* ---------- Crosshair sync between charts ---------- */
 
@@ -359,6 +370,11 @@ const chart = computed(() => {
       min = Math.min(min, pts[i]!.value)
       max = Math.max(max, pts[i]!.value)
     }
+    // keep the reference line in view too
+    if (refLevel.value !== null) {
+      min = Math.min(min, refLevel.value)
+      max = Math.max(max, refLevel.value)
+    }
     const pad = (max - min || Math.abs(max) || 1) * 0.08
     min -= pad
     max += pad
@@ -458,6 +474,15 @@ const chart = computed(() => {
     yTicks,
     xTicks,
     // The latest value stays on the right axis even when panned into the past
+    // Reference line, when it falls within the plot (a manual y range can push it off)
+    ref:
+      refLevel.value !== null && y(refLevel.value) >= 0 && y(refLevel.value) <= H
+        ? {
+            d: `M0 ${y(refLevel.value).toFixed(1)} H${W}`,
+            top: pct(y(refLevel.value), H),
+            label: `${props.refLabel ? `${props.refLabel} ` : ''}${valueFmt.format(refLevel.value)}`,
+          }
+        : null,
     lastTag: { label: valueFmt.format(last.value), top: pct(clamp(y(last.value), 0, H), H) },
     atLatest: v.end >= n - 0.51,
     at: (i: number) => ({
@@ -714,6 +739,9 @@ function onKeydown(e: KeyboardEvent) {
               :style="{ left: sep.left }"
             />
           </div>
+          <span v-if="chart.ref" class="ref-tag" :style="{ top: chart.ref.top }">{{
+            chart.ref.label
+          }}</span>
           <span class="last-tag" :style="{ top: chart.lastTag.top }">{{
             chart.lastTag.label
           }}</span>
@@ -735,6 +763,7 @@ function onKeydown(e: KeyboardEvent) {
             <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
             <path :d="chart.area" :fill="`url(#${gradId})`" />
             <path class="line" :d="chart.line" />
+            <path v-if="chart.ref" class="ref-line" :d="chart.ref.d" />
           </svg>
 
           <div
@@ -917,6 +946,29 @@ function onKeydown(e: KeyboardEvent) {
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+}
+
+.ref-line {
+  fill: none;
+  stroke: var(--color-reference);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+/* Its label sits just above the line at the left edge of the plot */
+.ref-tag {
+  position: absolute;
+  left: 0.4rem;
+  transform: translateY(calc(-100% - 2px));
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-background-soft) 75%, transparent);
+  color: var(--color-reference);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .y-tick,

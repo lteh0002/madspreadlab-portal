@@ -83,3 +83,67 @@ export async function uploadProductData(file: File, signal?: AbortSignal): Promi
   const body = (await res.json().catch(() => ({}))) as { message?: unknown }
   return typeof body.message === 'string' ? body.message : ''
 }
+
+/** One of a product's spreads, as listed on the Manage indices spreads page */
+export interface ManagedSpread {
+  id: string
+  /** Futures month codes, e.g. "N-Q" */
+  spreadName: string
+  /** Contract months, e.g. "Jul26", "Aug26" */
+  front: string
+  back: string
+  /** Months between the contracts: 1 = monthly roll, 3 = quarterly */
+  months: number
+  fairValue: number | null
+  /** Price bars across all intervals */
+  bars: number
+}
+
+export interface ManagedProduct {
+  _id: string
+  name: string
+  exchange: string
+  currency: string
+  /** Newest contracts first */
+  spreads: ManagedSpread[]
+}
+
+/** GET /api/products — every product with all its spreads (with or without price data) */
+export async function fetchManagedProducts(signal?: AbortSignal): Promise<ManagedProduct[]> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/api/products`, { signal })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    throw new Error(NETWORK_ERROR)
+  }
+  if (!res.ok) throw new Error(await errorMessage(res))
+  const body = (await res.json()) as { data?: ManagedProduct[] }
+  return body.data ?? []
+}
+
+/**
+ * PATCH /api/spreads/:id/fair-value   Body: { fairValue: number | null }
+ * Sets a spread's fair value, or clears it with null. Resolves with the value as saved.
+ */
+export async function setSpreadFairValue(
+  spreadId: string,
+  fairValue: number | null,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/api/spreads/${encodeURIComponent(spreadId)}/fair-value`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fairValue }),
+      signal,
+    })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    throw new Error(NETWORK_ERROR)
+  }
+  if (!res.ok) throw new Error(await errorMessage(res))
+  const body = (await res.json().catch(() => ({}))) as { data?: { fairValue?: number | null } }
+  return body.data?.fairValue ?? fairValue
+}

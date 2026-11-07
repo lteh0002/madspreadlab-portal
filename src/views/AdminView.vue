@@ -19,10 +19,10 @@ const addProductOpen = ref(false)
 const uploadDataOpen = ref(false)
 
 /**
- * Settings shown on the admin page. To enable one, set `to` (its own page) or
+ * Settings shown on the admin page, in sections. To enable one, set `to` (its own page) or
  * `onSelect` (a pop-up); options with neither show "Coming soon".
  */
-const OPTIONS: AdminOption[] = [
+const PRODUCT_OPTIONS: AdminOption[] = [
   {
     title: 'Add new product',
     description: 'Add a product to the database, ready for its data.',
@@ -36,15 +36,24 @@ const OPTIONS: AdminOption[] = [
     onSelect: () => (uploadDataOpen.value = true),
   },
   {
-    title: 'Manage products',
-    description: 'Edit, hide or remove the products already listed.',
+    title: 'Manage indices spreads',
+    description: "See each index's spreads and set their fair values.",
     icon: 'list',
+    to: '/admin/products',
   },
+]
+
+const ACCESS_OPTIONS: AdminOption[] = [
   {
     title: 'Admin access',
     description: 'Choose who can sign in and change these settings.',
     icon: 'users',
   },
+]
+
+const SECTIONS = [
+  { title: 'Products', options: PRODUCT_OPTIONS },
+  { title: 'Access', options: ACCESS_OPTIONS },
 ]
 </script>
 
@@ -55,44 +64,52 @@ const OPTIONS: AdminOption[] = [
       <p class="subtitle">Manage products and the data behind them.</p>
     </header>
 
-    <ul class="grid">
-      <li v-for="o in OPTIONS" :key="o.title">
-        <RouterLink v-if="o.to" :to="o.to" class="card">
-          <span class="tile"><AppIcon :name="o.icon" :size="28" :stroke-width="2" /></span>
-          <span class="text">
-            <span class="title">{{ o.title }}</span>
-            <span class="desc">{{ o.description }}</span>
-          </span>
-          <span class="go" aria-hidden="true"
-            ><AppIcon name="arrow" :size="20" :stroke-width="2.25"
-          /></span>
-        </RouterLink>
-        <button
-          v-else-if="o.onSelect"
-          type="button"
-          class="card"
-          aria-haspopup="dialog"
-          @click="o.onSelect"
-        >
-          <span class="tile"><AppIcon :name="o.icon" :size="28" :stroke-width="2" /></span>
-          <span class="text">
-            <span class="title">{{ o.title }}</span>
-            <span class="desc">{{ o.description }}</span>
-          </span>
-          <span class="go" aria-hidden="true"
-            ><AppIcon :name="o.icon" :size="20" :stroke-width="2.25"
-          /></span>
-        </button>
-        <div v-else class="card disabled" aria-disabled="true">
-          <span class="tile"><AppIcon :name="o.icon" :size="28" :stroke-width="2" /></span>
-          <span class="text">
-            <span class="title">{{ o.title }}</span>
-            <span class="desc">{{ o.description }}</span>
-          </span>
-          <span class="soon">Coming soon</span>
-        </div>
-      </li>
-    </ul>
+    <section
+      v-for="sec in SECTIONS"
+      :key="sec.title"
+      class="section"
+      :aria-labelledby="`sec-${sec.title}`"
+    >
+      <h2 :id="`sec-${sec.title}`" class="section-title">{{ sec.title }}</h2>
+      <ul class="grid">
+        <li v-for="o in sec.options" :key="o.title">
+          <RouterLink v-if="o.to" :to="o.to" class="card">
+            <span class="tile"><AppIcon :name="o.icon" :size="28" :stroke-width="2" /></span>
+            <span class="text">
+              <span class="title">{{ o.title }}</span>
+              <span class="desc">{{ o.description }}</span>
+            </span>
+            <span class="go" aria-hidden="true"
+              ><AppIcon name="arrow" :size="20" :stroke-width="2.25"
+            /></span>
+          </RouterLink>
+          <button
+            v-else-if="o.onSelect"
+            type="button"
+            class="card"
+            aria-haspopup="dialog"
+            @click="o.onSelect"
+          >
+            <span class="tile"><AppIcon :name="o.icon" :size="28" :stroke-width="2" /></span>
+            <span class="text">
+              <span class="title">{{ o.title }}</span>
+              <span class="desc">{{ o.description }}</span>
+            </span>
+            <span class="go" aria-hidden="true"
+              ><AppIcon :name="o.icon" :size="20" :stroke-width="2.25"
+            /></span>
+          </button>
+          <div v-else class="card disabled" aria-disabled="true">
+            <span class="tile"><AppIcon :name="o.icon" :size="28" :stroke-width="2" /></span>
+            <span class="text">
+              <span class="title">{{ o.title }}</span>
+              <span class="desc">{{ o.description }}</span>
+            </span>
+            <span class="soon">Coming soon</span>
+          </div>
+        </li>
+      </ul>
+    </section>
 
     <AddProductDialog v-model:open="addProductOpen" />
     <UploadDataDialog v-model:open="uploadDataOpen" />
@@ -114,6 +131,18 @@ h1 {
   margin-top: 0.75rem;
   font-size: 1.25rem;
   color: var(--color-text);
+}
+
+.section + .section {
+  margin-top: 2.5rem;
+}
+.section-title {
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .grid {

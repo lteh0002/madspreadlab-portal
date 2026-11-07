@@ -24,6 +24,8 @@
   --color-accent-border: rgba(47, 209, 129, 0.38);
   --color-accent-solid: #15834f;
   --color-on-accent: #ffffff;
+  /* Reference levels drawn on charts (e.g. fair value): stands apart from the green line */
+  --color-reference: #f0b44c;
 
   --card-background: linear-gradient(155deg, #0f2a1e 0%, #0b1c15 55%, #09160f 100%);
   --tile-background: linear-gradient(150deg, #1f8a56 0%, #0f4f31 100%);
@@ -59,6 +61,7 @@
   --color-accent-border: rgba(15, 159, 98, 0.35);
   --color-accent-solid: #11925a;
   --color-on-accent: #ffffff;
+  --color-reference: #b26a00;
 
   --card-background: linear-gradient(155deg, #ffffff 0%, #f3faf6 100%);
   --tile-background: linear-gradient(150deg, #1fa365 0%, #0d7547 100%);

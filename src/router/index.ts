@@ -52,6 +52,12 @@ const router = createRouter({
       component: () => import('../views/AdminView.vue'),
     },
     {
+      // Every product and its spreads; set fair values. Not protected yet, like /admin.
+      path: '/admin/products',
+      name: 'manage-products',
+      component: () => import('../views/ManageProductsView.vue'),
+    },
+    {
       path: '/about',
       name: 'about',
       // route level code-splitting

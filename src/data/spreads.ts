@@ -111,8 +111,9 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             name: 'roll-fkli',
             label: 'FKLI Roll',
             pageTitle: 'FKLI Index Roll',
-            routeName: 'index-roll',
-            routeParams: { market: 'fkli' },
+            // Opens the price chart from the database (price_data), like MCA
+            routeName: 'product-chart',
+            routeParams: { product: 'FKLI' },
             description: 'FBM KLCI index roll',
             emoji: '🇲🇾',
             badge: 'FKLI',

@@ -43,6 +43,8 @@ const PER_ROW_OPTIONS: PerRow[] = [1, 2, 3]
 const CHART_HEIGHTS: Record<PerRow, number> = { 1: 260, 2: 240, 3: 220 }
 
 const perRow = ref<PerRow>(1)
+/** Draw each spread's fair value on its chart */
+const showFairValue = ref(true)
 /** Rolls the viewer has unticked in the Charts dropdown (the first chart always shows) */
 const hiddenIds = ref<string[]>([])
 
@@ -51,7 +53,7 @@ const hiddenIds = ref<string[]>([])
  * only: everything works without it.
  */
 const storageKey = computed(() => `product-chart:${props.product}`)
-function readSaved(): { perRow?: unknown; hidden?: unknown } {
+function readSaved(): { perRow?: unknown; hidden?: unknown; fairValue?: unknown } {
   try {
     const v = JSON.parse(localStorage.getItem(storageKey.value) ?? '{}')
     return v && typeof v === 'object' ? v : {}
@@ -63,13 +65,17 @@ function save() {
   try {
     localStorage.setItem(
       storageKey.value,
-      JSON.stringify({ perRow: perRow.value, hidden: hiddenIds.value }),
+      JSON.stringify({
+        perRow: perRow.value,
+        hidden: hiddenIds.value,
+        fairValue: showFairValue.value,
+      }),
     )
   } catch {
     // storage blocked or full: the layout just isn't remembered
   }
 }
-watch([perRow, hiddenIds], save, { deep: true })
+watch([perRow, hiddenIds, showFairValue], save, { deep: true })
 
 /* ---------- The product's spreads: one chart each, newest contract month first ---------- */
 
@@ -291,6 +297,11 @@ const HISTORY_PAGE = 6
 /** How many charts are shown with every roll on (grows with "Show more"; per visit only) */
 const shownCount = ref(HISTORY_PAGE)
 /** Ticked rolls in chart order: the first chart, then the others not hidden */
+/** Some spread has a fair value, so the Fair value toggle is worth showing */
+const hasFairValue = computed(() =>
+  spreads.value.some((s) => typeof s.fairValue === 'number' && Number.isFinite(s.fairValue)),
+)
+
 const tickedSpreads = computed(() => {
   const hidden = new Set(hiddenIds.value)
   return orderedSpreads.value.filter((s, i) => i === 0 || !hidden.has(s.id))
@@ -360,6 +371,7 @@ watch(
       ? hidden.filter((id): id is string => typeof id === 'string')
       : []
     rollsOpen.value = false
+    showFairValue.value = readSaved().fairValue !== false
     daySel.value = { from: lastDay.value, to: 0 }
     loadSpreads()
   },
@@ -401,21 +413,6 @@ onUnmounted(() => spreadsCtl?.abort())
       <!-- Settings shared by every chart: interval, layout and the days shown -->
       <section class="card controls" aria-label="Chart settings">
         <div class="pickers">
-          <label class="picker">
-            <span class="picker-label">Interval</span>
-            <span class="select-wrap">
-              <select v-model.number="interval" :disabled="intervals.length < 2">
-                <option v-for="iv in intervals" :key="iv" :value="iv">{{ iv }} min</option>
-              </select>
-              <AppIcon
-                v-if="intervals.length > 1"
-                name="chevron-down"
-                :size="16"
-                class="select-chev"
-              />
-            </span>
-          </label>
-
           <div v-if="spreads.length > 1" ref="rollsEl" class="picker rolls">
             <span id="rolls-label" class="picker-label">Charts</span>
             <button
@@ -472,6 +469,30 @@ onUnmounted(() => spreadsCtl?.abort())
                 @click="perRow = n"
               >
                 {{ n }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="hasFairValue" class="picker">
+            <span id="fv-label" class="picker-label">Fair value</span>
+            <div class="seg" role="group" aria-labelledby="fv-label">
+              <button
+                type="button"
+                :class="{ active: showFairValue }"
+                :aria-pressed="showFairValue"
+                title="Draw each spread's fair value on its chart"
+                @click="showFairValue = true"
+              >
+                Show
+              </button>
+              <button
+                type="button"
+                :class="{ active: !showFairValue }"
+                :aria-pressed="!showFairValue"
+                title="Hide the fair value lines"
+                @click="showFairValue = false"
+              >
+                Hide
               </button>
             </div>
           </div>
@@ -538,6 +559,7 @@ onUnmounted(() => spreadsCtl?.abort())
           :height="CHART_HEIGHTS[columns]"
           :fixed-interval="fixedInterval"
           :hover-key="hoverKey"
+          :show-fair-value="showFairValue"
           @hover-key="hoverKey = $event"
           @day-count="dayCounts.set(s.id, $event)"
         />

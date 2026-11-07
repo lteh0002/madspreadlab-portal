@@ -16,6 +16,8 @@ export interface ProductSpread {
   /** Contract months, e.g. "Oct26", "Nov26" */
   front: string
   back: string
+  /** Fair value of the spread, when one has been set (null or absent otherwise) */
+  fairValue?: number | null
   /** Intervals that have data, shortest first */
   intervals: SpreadInterval[]
 }
