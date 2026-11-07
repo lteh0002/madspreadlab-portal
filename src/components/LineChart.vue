@@ -64,6 +64,13 @@ const props = withDefaults(
     locked?: boolean
     /** Zone intraday times are shown in (and days split by), e.g. MYT. Plain dates are unaffected. */
     displayZone?: DisplayZone
+    /** Plot height in px (axis labels sit outside it). Phones cap it at 260px. */
+    height?: number
+    /**
+     * Crosshair key hovered on another chart (see the `hover-key` event). This chart shows its
+     * crosshair on its own point with the same key, if it has one on screen.
+     */
+    syncKey?: string | null
   }>(),
   {
     initialCount: 65,
@@ -78,10 +85,21 @@ const props = withDefaults(
     dayStartHour: 0,
     locked: false,
     displayZone: () => UTC,
+    height: 360,
+    syncKey: null,
   },
 )
 
-const emit = defineEmits<{ retry: []; 'view-change': [view: ChartView] }>()
+const emit = defineEmits<{
+  retry: []
+  'view-change': [view: ChartView]
+  /**
+   * The hovered point's crosshair key, or null when the pointer leaves: "T-2 10:45" (trading day
+   * and time of day) with `relativeDays`, else the point's date. Pass it to other charts'
+   * `syncKey` to line their crosshairs up on the same moment.
+   */
+  'hover-key': [key: string | null]
+}>()
 
 /** SVG user units; the plot stretches to its box, lines keep a constant stroke width */
 const W = 1000
@@ -96,6 +114,8 @@ const TOOLTIP_PX = 215
 const GUTTER_PX = 40
 /** Horizontal room each rotated time label needs on a T-n axis */
 const TIME_LABEL_PX = 22
+/** Axis-drag scaling sensitivity per pixel dragged */
+const AXIS_SPEED = 0.005
 
 const gradId = `line-area-${useId()}`
 
@@ -129,6 +149,12 @@ onBeforeUnmount(() => resizeObs?.disconnect())
  * Bounds are half a slot outside the data so edge points aren't drawn on the border.
  */
 const view = ref<{ start: number; end: number } | null>(null)
+
+/**
+ * Value range set by the user (dragging the price axis, or panning vertically after that).
+ * null = auto: y fits the points on screen.
+ */
+const yRange = ref<{ min: number; max: number } | null>(null)
 
 const valueFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 const changeFmt = new Intl.NumberFormat('en-US', {
@@ -192,6 +218,36 @@ const days = computed(() => {
 const dayLabel = (t: number) =>
   props.maxLabelledDay !== null && t > props.maxLabelledDay ? 'T-X' : `T-${t}`
 const tLabel = (i: number) => dayLabel(days.value.t[i]!)
+
+/* ---------- Crosshair sync between charts ---------- */
+
+/** Point i's crosshair key: "T-2 10:45" on T-n charts (intraday), else its date */
+function hoverKey(i: number) {
+  const p = props.points[i]!
+  if (!props.relativeDays) return p.date
+  const t = `T-${days.value.t[i]}`
+  return intraday.value ? `${t} ${fmt.value.timeOfDay.format(toDate(p.date))}` : t
+}
+/** Crosshair key → point index (the first point with that key) */
+const keyIndex = computed(() => {
+  const map = new Map<string, number>()
+  for (let i = 0; i < props.points.length; i++) {
+    const k = hoverKey(i)
+    if (!map.has(k)) map.set(k, i)
+  }
+  return map
+})
+watch(hover, (i) => emit('hover-key', i === null ? null : hoverKey(i)))
+
+/** The point under this chart's own pointer, else the one hovered on another chart */
+const shown = computed(() => {
+  if (hover.value !== null) return { i: hover.value, synced: false }
+  const v = view.value
+  const i = props.syncKey == null ? undefined : keyIndex.value.get(props.syncKey)
+  // only when that point is on screen here
+  if (i === undefined || !v || i < v.start || i > v.end) return null
+  return { i, synced: true }
+})
 
 /** A 1/2/5 × 10^k step giving about `count` intervals */
 function niceStep(span: number, count: number) {
@@ -265,13 +321,19 @@ watch(
   () => props.points,
   (pts, old) => {
     hover.value = null
+    yRange.value = null // new values: fit them again
     if (!pts.length) view.value = null
     else showLatest(old?.length && view.value ? span() : props.initialCount)
   },
   { immediate: true },
 )
 
-defineExpose({ showLatest, showRange })
+/** Back to auto-fitting the price axis */
+function resetYScale() {
+  yRange.value = null
+}
+
+defineExpose({ showLatest, showRange, resetYScale })
 
 /* ---------- Geometry for the visible window ---------- */
 
@@ -287,16 +349,20 @@ const chart = computed(() => {
   const i0 = clamp(Math.floor(v.start), 0, n - 1)
   const i1 = clamp(Math.ceil(v.end), 0, n - 1)
 
-  // y fits the points on screen (TradingView-style auto scale)
+  // y fits the points on screen (TradingView-style auto scale), unless the user has set a range
   let min = Infinity
   let max = -Infinity
-  for (let i = i0; i <= i1; i++) {
-    min = Math.min(min, pts[i]!.value)
-    max = Math.max(max, pts[i]!.value)
+  if (yRange.value) {
+    ;({ min, max } = yRange.value)
+  } else {
+    for (let i = i0; i <= i1; i++) {
+      min = Math.min(min, pts[i]!.value)
+      max = Math.max(max, pts[i]!.value)
+    }
+    const pad = (max - min || Math.abs(max) || 1) * 0.08
+    min -= pad
+    max += pad
   }
-  const pad = (max - min || Math.abs(max) || 1) * 0.08
-  min -= pad
-  max += pad
   const y = (val: number) => (1 - (val - min) / (max - min)) * H
   const pct = (u: number, total: number) => `${((u / total) * 100).toFixed(3)}%`
 
@@ -380,6 +446,8 @@ const chart = computed(() => {
   const last = pts[n - 1]!
   return {
     n,
+    yMin: min,
+    yMax: max,
     grid,
     daySeparators,
     timeTicks,
@@ -392,7 +460,13 @@ const chart = computed(() => {
     // The latest value stays on the right axis even when panned into the past
     lastTag: { label: valueFmt.format(last.value), top: pct(clamp(y(last.value), 0, H), H) },
     atLatest: v.end >= n - 0.51,
-    at: (i: number) => ({ left: pct(x(i), W), top: pct(y(pts[i]!.value), H), fx: x(i) / W }),
+    at: (i: number) => ({
+      left: pct(x(i), W),
+      top: pct(y(pts[i]!.value), H),
+      fx: x(i) / W,
+      // false when a manual y range has pushed the point off the plot
+      inside: y(pts[i]!.value) >= 0 && y(pts[i]!.value) <= H,
+    }),
   }
 })
 
@@ -409,7 +483,7 @@ function tooltipSide(fx: number): 'right' | 'left' | 'center' {
 
 const tip = computed(() => {
   const c = chart.value
-  const i = hover.value
+  const i = shown.value?.i ?? null
   if (!c || i === null || i >= c.n) return null
   const p = props.points[i]!
   const prev = props.points[i - 1]
@@ -421,6 +495,7 @@ const tip = computed(() => {
     : fmt.value.longDate.format(d)
   return {
     ...pos,
+    synced: shown.value!.synced,
     // Right of the crosshair if it fits, else left, else (very narrow plots) centred on top
     side: tooltipSide(pos.fx),
     // With T-n labels: the trading day as the heading, the actual date and time beneath it
@@ -433,12 +508,18 @@ const tip = computed(() => {
 
 /* ---------- Pointer, wheel & keyboard ---------- */
 
-let drag: { x: number; start: number; span: number } | null = null
+let drag: {
+  x: number
+  y: number
+  start: number
+  span: number
+  yRange: { min: number; max: number } | null
+} | null = null
 const dragging = ref(false)
 
 function plotFraction(clientX: number) {
   const rect = hitEl.value!.getBoundingClientRect()
-  return { fx: (clientX - rect.left) / rect.width, width: rect.width }
+  return { fx: (clientX - rect.left) / rect.width, width: rect.width, height: rect.height }
 }
 
 function updateHover(fx: number) {
@@ -457,13 +538,27 @@ function onPointerDown(e: PointerEvent) {
     return
   }
   hitEl.value?.setPointerCapture(e.pointerId)
-  drag = { x: e.clientX, start: view.value.start, span: span() }
+  drag = {
+    x: e.clientX,
+    y: e.clientY,
+    start: view.value.start,
+    span: span(),
+    yRange: yRange.value,
+  }
   dragging.value = true
 }
 
 function onPointerMove(e: PointerEvent) {
-  const { fx, width } = plotFraction(e.clientX)
-  if (drag) setView(drag.start - ((e.clientX - drag.x) / width) * drag.span, drag.span)
+  const { fx, width, height } = plotFraction(e.clientX)
+  if (drag) {
+    setView(drag.start - ((e.clientX - drag.x) / width) * drag.span, drag.span)
+    // With a manual price range, dragging also pans up and down (auto scale has nothing to pan)
+    const r = drag.yRange
+    if (r) {
+      const shift = ((e.clientY - drag.y) / height) * (r.max - r.min)
+      yRange.value = { min: r.min + shift, max: r.max + shift }
+    }
+  }
   updateHover(fx)
 }
 
@@ -493,9 +588,74 @@ function onWheel(e: WheelEvent) {
   updateHover(fx)
 }
 
+/* ---------- Axis scaling: drag or scroll on an axis to stretch it, double-click to reset ---------- */
+
+let axisDrag:
+  | { kind: 'y'; pos: number; min: number; max: number }
+  | { kind: 'x'; pos: number; start: number; span: number }
+  | null = null
+
+/** Scale the price range by `factor` (> 1 shows more values) around its middle */
+function scaleY(min: number, max: number, factor: number) {
+  const mid = (min + max) / 2
+  const half = Math.max(((max - min) / 2) * factor, Math.abs(mid) * 1e-9 || 1e-9)
+  yRange.value = { min: mid - half, max: mid + half }
+}
+
+function onAxisDown(e: PointerEvent, kind: 'x' | 'y') {
+  const c = chart.value
+  if (e.button !== 0 || !c || !view.value || props.locked) return
+  e.preventDefault()
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  hover.value = null
+  axisDrag =
+    kind === 'y'
+      ? { kind, pos: e.clientY, min: c.yMin, max: c.yMax }
+      : { kind, pos: e.clientX, start: view.value.start, span: span() }
+}
+
+function onAxisMove(e: PointerEvent) {
+  const d = axisDrag
+  if (!d) return
+  if (d.kind === 'y') {
+    // Drag down to squash the line (more values on screen), up to stretch it
+    scaleY(d.min, d.max, Math.exp((e.clientY - d.pos) * AXIS_SPEED))
+  } else {
+    // Drag right to spread the bars out (zoom in), left to fit more; the right edge stays put
+    const next = clampSpan(d.span * Math.exp(-(e.clientX - d.pos) * AXIS_SPEED))
+    setView(d.start + d.span - next, next)
+  }
+}
+
+function onAxisUp(e: PointerEvent) {
+  const el = e.currentTarget as HTMLElement
+  if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+  axisDrag = null
+}
+
+function onAxisWheel(e: WheelEvent, kind: 'x' | 'y') {
+  const c = chart.value
+  if (!c || props.locked) return
+  e.preventDefault()
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
+  const delta = (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * unit
+  if (kind === 'y') scaleY(c.yMin, c.yMax, Math.exp(delta * ZOOM_SPEED))
+  else zoomBy(Math.exp(delta * ZOOM_SPEED), 1)
+}
+
+function onAxisReset(kind: 'x' | 'y') {
+  if (kind === 'y') resetYScale()
+  else showLatest(props.initialCount)
+}
+
 function onKeydown(e: KeyboardEvent) {
   if (props.locked) return
+  const c = chart.value
   const actions: Record<string, () => void> = {
+    // Price axis: PageUp/PageDown stretch/squash it, A returns to auto scale
+    PageUp: () => c && scaleY(c.yMin, c.yMax, 0.8),
+    PageDown: () => c && scaleY(c.yMin, c.yMax, 1.25),
+    a: resetYScale,
     ArrowLeft: () => panBy(-0.1),
     ArrowRight: () => panBy(0.1),
     '+': () => zoomBy(0.8),
@@ -513,7 +673,12 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="chart" :class="{ grouped: relativeDays }" :aria-busy="loading">
+  <div
+    class="chart"
+    :class="{ grouped: relativeDays }"
+    :style="{ '--plot-h': `${height}px` }"
+    :aria-busy="loading"
+  >
     <div ref="plotEl" class="plot">
       <!-- Everything drawn lives in the stage, which is blurred while loading, on error, or with no data -->
       <div class="stage" :class="{ veiled: veiled }" :inert="veiled || undefined">
@@ -580,7 +745,7 @@ function onKeydown(e: KeyboardEvent) {
             :aria-label="
               locked
                 ? undefined
-                : 'Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data.'
+                : 'Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data; Page Up and Page Down stretch the price axis, A resets it.'
             "
             @pointerdown="onPointerDown"
             @pointermove="onPointerMove"
@@ -592,10 +757,10 @@ function onKeydown(e: KeyboardEvent) {
           >
             <template v-if="tip">
               <div class="crosshair" :style="{ left: tip.left }" />
-              <div class="dot" :style="{ left: tip.left, top: tip.top }" />
+              <div v-if="tip.inside" class="dot" :style="{ left: tip.left, top: tip.top }" />
               <div
                 class="tooltip"
-                :class="tip.side"
+                :class="[tip.side, { synced: tip.synced }]"
                 :style="{ left: tip.side === 'center' ? '50%' : tip.left }"
               >
                 <span class="tip-date">{{ tip.date }}</span>
@@ -611,6 +776,43 @@ function onKeydown(e: KeyboardEvent) {
               </div>
             </template>
           </div>
+
+          <!-- Axis handles: drag or scroll to stretch, double-click to reset (price: auto fit; time: default view) -->
+          <template v-if="!locked">
+            <div
+              v-for="side in ['left', 'right']"
+              :key="side"
+              class="axis-hit y"
+              :class="side"
+              title="Drag to stretch the price axis · double-click for auto scale"
+              @pointerdown="onAxisDown($event, 'y')"
+              @pointermove="onAxisMove"
+              @pointerup="onAxisUp"
+              @pointercancel="onAxisUp"
+              @wheel="onAxisWheel($event, 'y')"
+              @dblclick="onAxisReset('y')"
+            />
+            <div
+              class="axis-hit x"
+              title="Drag to stretch the time axis · double-click to reset"
+              @pointerdown="onAxisDown($event, 'x')"
+              @pointermove="onAxisMove"
+              @pointerup="onAxisUp"
+              @pointercancel="onAxisUp"
+              @wheel="onAxisWheel($event, 'x')"
+              @dblclick="onAxisReset('x')"
+            />
+          </template>
+
+          <button
+            v-if="yRange && !locked"
+            type="button"
+            class="auto-scale"
+            title="Fit the price axis to the data on screen"
+            @click="resetYScale"
+          >
+            Auto scale
+          </button>
 
           <button
             v-if="!chart.atLatest && !locked"
@@ -675,7 +877,7 @@ function onKeydown(e: KeyboardEvent) {
 
 .plot {
   position: relative;
-  height: 360px;
+  height: var(--plot-h, 360px);
 }
 
 .svg {
@@ -862,6 +1064,10 @@ function onKeydown(e: KeyboardEvent) {
   transform: translateX(14px);
   pointer-events: none;
 }
+/* Crosshair mirrored from another chart: same readout, a touch quieter */
+.tooltip.synced {
+  opacity: 0.85;
+}
 .tooltip.left {
   transform: translateX(calc(-100% - 14px));
 }
@@ -891,6 +1097,58 @@ function onKeydown(e: KeyboardEvent) {
 }
 .tip-row.muted {
   color: var(--color-text-muted);
+}
+
+/* Invisible strips over the axis gutters that stretch the axes */
+.axis-hit {
+  position: absolute;
+  touch-action: none;
+  user-select: none;
+}
+.axis-hit.y {
+  top: 0;
+  bottom: 0;
+  cursor: ns-resize;
+}
+.axis-hit.y.left {
+  right: 100%;
+  width: 3rem;
+}
+.axis-hit.y.right {
+  left: 100%;
+  width: 3.5rem;
+}
+.axis-hit.x {
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 1.75rem;
+  cursor: ew-resize;
+}
+.grouped .axis-hit.x {
+  height: 5.25rem;
+}
+
+.auto-scale {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--color-border-hover);
+  border-radius: 6px;
+  background: var(--color-surface-raised);
+  color: var(--color-heading);
+  cursor: pointer;
+}
+.auto-scale:hover {
+  border-color: var(--color-accent);
+}
+.auto-scale:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* ---------- Loading / error / empty: blur the chart, message on top ---------- */
@@ -1016,7 +1274,7 @@ function onKeydown(e: KeyboardEvent) {
     padding-right: 3.5rem;
   }
   .plot {
-    height: 260px;
+    height: min(var(--plot-h, 360px), 260px);
   }
 }
 </style>
