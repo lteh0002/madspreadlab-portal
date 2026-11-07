@@ -120,6 +120,16 @@ const SECTIONS = [
 .hero {
   padding: 1.5rem 0 2.25rem;
 }
+/*
+ * Beside the sidebar (wide screens), the title's middle lines up with the logo's: the page's
+ * top padding (2.25rem) less 0.75rem puts the 2.75rem-tall title at the logo row's centre.
+ */
+@media (min-width: 901px) {
+  .hero {
+    margin-top: -0.75rem;
+    padding-top: 0;
+  }
+}
 h1 {
   font-size: clamp(2rem, 3.4vw, 2.75rem);
   font-weight: 700;

@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
-import SparkLine from '@/components/SparkLine.vue'
 import { SPREAD_SECTIONS, type SpreadInfo } from '@/data/spreads'
 import { supportsFlagEmoji } from '@/composables/flagEmoji'
 
@@ -192,7 +191,7 @@ function onSearchKeydown(e: KeyboardEvent) {
 
     <div class="toolbar">
       <label class="search">
-        <AppIcon name="search" :size="24" class="search-icon" />
+        <AppIcon name="search" :size="18" class="search-icon" />
         <span class="sr-only">Search spreads</span>
         <input
           ref="searchInput"
@@ -223,10 +222,10 @@ function onSearchKeydown(e: KeyboardEvent) {
           :aria-expanded="filterOpen"
           @click="filterOpen = !filterOpen"
         >
-          <AppIcon name="filter" :size="20" />
+          <AppIcon name="filter" :size="17" />
           <span>Filter</span>
           <span v-if="activeFilterCount" class="filter-count">{{ activeFilterCount }}</span>
-          <AppIcon name="chevron-down" :size="18" class="chev" :class="{ open: filterOpen }" />
+          <AppIcon name="chevron-down" :size="16" class="chev" :class="{ open: filterOpen }" />
         </button>
 
         <div v-if="filterOpen" class="filter-panel" role="group" aria-label="Filter spreads">
@@ -270,7 +269,7 @@ function onSearchKeydown(e: KeyboardEvent) {
         :title="isFiltering ? 'Clear search and filters to collapse' : undefined"
         @click="toggleAll"
       >
-        <AppIcon :name="allCollapsed ? 'expand-all' : 'collapse-all'" :size="20" />
+        <AppIcon :name="allCollapsed ? 'expand-all' : 'collapse-all'" :size="17" />
         <span>{{ allCollapsed ? 'Expand all' : 'Collapse all' }}</span>
       </button>
     </div>
@@ -368,6 +367,11 @@ function onSearchKeydown(e: KeyboardEvent) {
               >
                 <div class="collapse-inner">
                   <div class="grid">
+                    <!--
+                      Square tiles: the flag (or badge / icon) on top, name and description at
+                      the bottom. Tags aren't shown (the section, flag and name already say them);
+                      search and the filter still use them.
+                    -->
                     <RouterLink
                       v-for="s in group.spreads"
                       :key="s.name"
@@ -385,24 +389,13 @@ function onSearchKeydown(e: KeyboardEvent) {
                         >
                           <template v-if="s.emoji && showEmoji">{{ s.emoji }}</template>
                           <template v-else-if="s.badge">{{ s.badge }}</template>
-                          <AppIcon v-else name="trend" :size="34" :stroke-width="2.5" />
+                          <AppIcon v-else name="trend" :size="26" :stroke-width="2.5" />
                         </div>
-                        <div class="card-text">
-                          <span class="card-title">{{ s.label ?? s.name }}</span>
-                          <span v-if="s.description" class="card-desc">{{ s.description }}</span>
-                        </div>
-                        <div class="card-spark">
-                          <SparkLine :seed="s.name" />
-                        </div>
+                        <AppIcon name="arrow" :size="18" :stroke-width="2" class="go" />
                       </div>
-                      <div class="card-bottom">
-                        <div class="tags">
-                          <span class="tag primary">{{ section.title }}</span>
-                          <span v-for="t in s.tags" :key="t" class="tag">{{ t }}</span>
-                        </div>
-                        <span class="go" aria-hidden="true"
-                          ><AppIcon name="arrow" :size="20" :stroke-width="2"
-                        /></span>
+                      <div class="card-text">
+                        <span class="card-title">{{ s.label ?? s.name }}</span>
+                        <span v-if="s.description" class="card-desc">{{ s.description }}</span>
                       </div>
                     </RouterLink>
                   </div>
@@ -450,6 +443,16 @@ function onSearchKeydown(e: KeyboardEvent) {
 .hero {
   padding: 1.5rem 0 2.25rem;
 }
+/*
+ * Beside the sidebar (wide screens), the title's middle lines up with the logo's: the page's
+ * top padding (2.25rem) less 0.75rem puts the 2.75rem-tall title at the logo row's centre.
+ */
+@media (min-width: 901px) {
+  .hero {
+    margin-top: -0.75rem;
+    padding-top: 0;
+  }
+}
 h1 {
   font-size: clamp(2rem, 3.4vw, 2.75rem);
   font-weight: 700;
@@ -463,11 +466,11 @@ h1 {
   color: var(--color-text);
 }
 
-/* ---------- Toolbar ---------- */
+/* ---------- Toolbar: search, Filter, Collapse — one 44px row, like the chart page's controls ---------- */
 .toolbar {
   display: flex;
-  gap: 1.5rem;
-  margin-bottom: 3.25rem;
+  gap: 0.75rem;
+  margin-bottom: 2.75rem;
 }
 
 .search {
@@ -475,11 +478,11 @@ h1 {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 1.1rem;
-  height: 64px;
-  padding: 0 0.9rem 0 1.5rem;
+  gap: 0.7rem;
+  height: 44px;
+  padding: 0 0.5rem 0 1rem;
   border: 1px solid var(--color-border-hover);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-background-soft) 70%, transparent);
   backdrop-filter: blur(8px);
   transition:
@@ -489,7 +492,7 @@ h1 {
 }
 .search:focus-within {
   border-color: var(--color-accent-border);
-  box-shadow: 0 0 0 4px var(--color-accent-soft);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 .search-icon {
   flex: none;
@@ -504,7 +507,7 @@ h1 {
   background: transparent;
   color: var(--color-heading);
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 .search input::placeholder {
   color: var(--color-text-muted);
@@ -516,9 +519,9 @@ h1 {
   flex: none;
   display: grid;
   place-items: center;
-  padding: 0.4rem;
+  padding: 0.3rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--color-background-mute);
   color: var(--color-heading);
   cursor: pointer;
@@ -532,17 +535,16 @@ h1 {
 .tool-btn {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  height: 100%;
-  min-height: 58px;
-  padding: 0 1.25rem;
+  gap: 0.5rem;
+  height: 44px;
+  padding: 0 0.95rem;
   border: 1px solid var(--color-border-hover);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-background-soft) 70%, transparent);
   backdrop-filter: blur(8px);
   color: var(--color-heading);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: border-color 0.2s;
@@ -554,7 +556,6 @@ h1 {
 }
 .tool-btn {
   flex: none;
-  height: auto;
 }
 .tool-btn:disabled {
   opacity: 0.45;
@@ -824,33 +825,34 @@ h3 {
   background: linear-gradient(to right, var(--color-border-hover), transparent);
 }
 
-/* ---------- Cards ---------- */
-/* auto-fill (not auto-fit) so cards keep the same width in every category,
-   even when a category has a single spread */
+/* ---------- Cards: flat square tiles ---------- */
+/* auto-fill (not auto-fit) so tiles keep the same size in every category, even a category
+   with a single spread; four across beside the sidebar on a laptop */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
-  gap: 2.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
+  gap: 1rem;
 }
 
 .card {
-  position: relative;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
-  padding: 1.4rem 1.4rem 1.25rem;
+  justify-content: space-between;
+  gap: 1rem;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 1.15rem;
   border: 1px solid var(--color-border-hover);
   border-radius: var(--radius-lg);
-  background: var(--card-background);
-  box-shadow: var(--shadow-card);
+  /* one flat surface: no gradient, no shadow */
+  background: var(--color-background-soft);
   color: var(--color-text);
   transition:
     border-color 0.2s,
     transform 0.2s;
 }
 .card:hover {
-  background: var(--card-background);
+  background: var(--color-background-soft);
   border-color: var(--color-accent-border);
   transform: translateY(-2px);
 }
@@ -860,101 +862,68 @@ h3 {
 }
 
 .card-top {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(110px, 32%);
-  align-items: start;
-  gap: 1.75rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
+/* Neutral tile: the flag brings the colour; the icon (no flag) is the only green on the card */
 .tile {
   display: grid;
   place-items: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
-  background: var(--tile-background);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 6%, transparent);
-  color: #fff;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-mute);
+  color: var(--color-accent);
 }
 .tile.text {
-  font-size: 1.3rem;
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  color: var(--color-heading);
 }
 .tile.emoji {
-  font-size: 2.6rem;
+  font-size: 1.9rem;
   line-height: 1;
   /* flag emoji are full-colour; keep the font stack emoji-capable */
   font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
 }
+/* Quiet until hovered: the whole tile is the link */
+.go {
+  color: var(--color-text-muted);
+  transition:
+    color 0.2s,
+    transform 0.2s;
+}
+.card:hover .go {
+  color: var(--color-accent);
+  transform: translateX(2px);
+}
+
 .card-text {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding-top: 0.5rem;
+  gap: 0.25rem;
+  min-width: 0;
 }
 .card-title {
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--color-heading);
 }
 .card-desc {
-  font-size: 0.875rem;
-  color: var(--color-text);
-}
-.card-spark {
-  height: 110px;
-  margin-right: -0.4rem;
-  -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent);
-  mask-image: linear-gradient(to bottom, #000 60%, transparent);
-}
-
-.card-bottom {
-  /* pin to the card's bottom so tags/arrows line up across cards in a row */
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-.tag {
-  padding: 0.3rem 0.85rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-heading) 9%, transparent);
-  color: var(--color-heading);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.tag.primary {
-  background: var(--color-accent-solid);
-  color: var(--color-on-accent);
-}
-.go {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border-hover);
-  background: color-mix(in srgb, var(--color-background) 40%, transparent);
-  color: var(--color-heading);
-  transition:
-    background 0.2s,
-    color 0.2s,
-    border-color 0.2s;
-}
-.card:hover .go {
-  border-color: var(--color-accent-solid);
-  background: var(--color-accent-solid);
-  color: var(--color-on-accent);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  /* always two lines tall, so titles line up across a row whether the text wraps or not */
+  min-height: 2.7em;
+  color: var(--color-text-muted);
 }
 
 /* ---------- Empty states ---------- */
@@ -1021,23 +990,21 @@ h3 {
     font-size: 0.875rem;
   }
   .toolbar {
-    gap: 0.75rem;
+    gap: 0.5rem;
     margin-bottom: 2rem;
   }
   .search {
-    height: 52px;
-    padding-left: 1rem;
+    padding-left: 0.85rem;
   }
   .filter-btn {
-    min-height: 52px;
-    padding: 0 0.9rem;
+    padding: 0 0.8rem;
   }
   .filter-btn > span:not(.filter-count),
   .tool-btn > span {
     display: none;
   }
   .tool-btn {
-    padding: 0 0.9rem;
+    padding: 0 0.8rem;
   }
   h2 {
     gap: 0.75rem;
@@ -1050,29 +1017,23 @@ h3 {
   .section-link {
     font-size: 0.8rem;
   }
-  .card-top {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 1.1rem;
+  /* two tiles across on a phone */
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr));
+    gap: 0.75rem;
   }
-  .card-spark {
-    grid-column: 1 / -1;
-    height: 70px;
+  .card {
+    padding: 0.95rem;
   }
   .tile {
-    width: 60px;
-    height: 60px;
-  }
-  .tile.text {
-    font-size: 1.1rem;
+    width: 44px;
+    height: 44px;
   }
   .tile.emoji {
-    font-size: 2.2rem;
+    font-size: 1.6rem;
   }
   .card-title {
-    font-size: 1.1rem;
-  }
-  .tags {
-    gap: 0.5rem;
+    font-size: 1rem;
   }
 }
 </style>
