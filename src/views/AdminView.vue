@@ -121,15 +121,15 @@ const SECTIONS = [
   padding: 1.5rem 0 2.25rem;
 }
 h1 {
-  font-size: clamp(2.6rem, 5vw, 4.25rem);
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.03em;
   color: var(--color-heading);
 }
 .subtitle {
-  margin-top: 0.75rem;
-  font-size: 1.25rem;
+  margin-top: 0.6rem;
+  font-size: 1rem;
   color: var(--color-text);
 }
 
@@ -138,7 +138,7 @@ h1 {
 }
 .section-title {
   margin-bottom: 1rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -213,13 +213,13 @@ button.card {
   gap: 0.25rem;
 }
 .title {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 600;
   line-height: 1.25;
   color: var(--color-heading);
 }
 .desc {
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   color: var(--color-text);
 }
 
@@ -248,14 +248,17 @@ button.card:hover .go {
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-heading) 9%, transparent);
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 @media (max-width: 520px) {
+  .subtitle {
+    font-size: 0.875rem;
+  }
   .card {
     grid-template-columns: auto minmax(0, 1fr);
   }
