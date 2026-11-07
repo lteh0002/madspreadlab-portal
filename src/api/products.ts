@@ -71,7 +71,8 @@ export const UPLOAD_MAX_BYTES = 4 * 1024 * 1024
  *
  * The file must be named like "MCA Oct26-Nov26 Calendar_15min.csv" (see ./dataFileName.ts);
  * the backend reads the product and series from that name, so nothing else is sent.
- * Columns: Timestamp (UTC), Open, High, Low, Close (extra columns are ignored).
+ * Columns: Timestamp (UTC), Open, High, Low, Close, and optionally AVol, BVol (ask / bid
+ * volume; other columns are ignored).
  *
  * Resolves with the server's summary, e.g. "Imported 270 bars for MCA Oct26-Nov26 Calendar
  * (15 min): 270 new." Rejects with the server's reason (bad name, unknown product, bad rows…).

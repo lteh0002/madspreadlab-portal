@@ -36,6 +36,9 @@ export interface PriceBar {
   high: number
   low: number
   close: number
+  /** Ask / bid volume, when the uploaded file had AVol / BVol for this bar */
+  aVol?: number
+  bVol?: number
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {

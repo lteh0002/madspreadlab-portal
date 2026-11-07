@@ -222,7 +222,8 @@ async function uploadAnother() {
             <span class="drop-text"><strong>Choose a file</strong> or drag it here</span>
             <span :id="id('file-hint')" class="hint">
               Name it like <code class="example">{{ DATA_FILE_EXAMPLE }}.csv</code><br />
-              {{ TYPES_LABEL }} · up to {{ MAX_LABEL }}
+              {{ TYPES_LABEL }} · up to {{ MAX_LABEL }}<br />
+              Columns: Timestamp (UTC), Open, High, Low, Close · optional AVol, BVol
             </span>
           </label>
 

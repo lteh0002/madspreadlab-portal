@@ -163,10 +163,6 @@ const view = ref<{ start: number; end: number } | null>(null)
 const yRange = ref<{ min: number; max: number } | null>(null)
 
 const valueFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
-const changeFmt = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 2,
-  signDisplay: 'exceptZero',
-})
 const DAY_MS = 86_400_000
 /**
  * "2026-09-28" (daily) or an ISO timestamp (intraday). Timestamps from the database are UTC;
@@ -187,10 +183,10 @@ const fmt = computed(() => {
   return {
     shortDate: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }),
     monthYear: new Intl.DateTimeFormat('en-GB', { month: 'short', year: '2-digit', timeZone }),
-    longDate: new Intl.DateTimeFormat('en-GB', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
+    /** Tooltip date, e.g. "15/09/2026" */
+    tipDate: new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
       timeZone,
     }),
@@ -511,13 +507,12 @@ const tip = computed(() => {
   const i = shown.value?.i ?? null
   if (!c || i === null || i >= c.n) return null
   const p = props.points[i]!
-  const prev = props.points[i - 1]
   const pos = c.at(i)
   const d = toDate(p.date)
   // The bar's own calendar date (and time, for intraday) in the display zone
   const when = intraday.value
-    ? `${fmt.value.longDate.format(d)} · ${fmt.value.timeOfDay.format(d)} ${zone.value.label}`
-    : fmt.value.longDate.format(d)
+    ? `${fmt.value.tipDate.format(d)} · ${fmt.value.timeOfDay.format(d)} ${zone.value.label}`
+    : fmt.value.tipDate.format(d)
   return {
     ...pos,
     synced: shown.value!.synced,
@@ -527,7 +522,6 @@ const tip = computed(() => {
     date: props.relativeDays ? tLabel(i) : when,
     when: props.relativeDays ? when : '',
     value: valueFmt.format(p.value),
-    change: prev ? changeFmt.format(p.value - prev.value) : '—',
   }
 })
 
@@ -797,10 +791,6 @@ function onKeydown(e: KeyboardEvent) {
                 <span class="tip-row">
                   <span>{{ valueLabel }}</span
                   ><strong>{{ tip.value }}</strong>
-                </span>
-                <span class="tip-row muted">
-                  <span>{{ intraday ? 'Change' : 'Day change' }}</span
-                  ><span>{{ tip.change }}</span>
                 </span>
               </div>
             </template>
@@ -1146,9 +1136,6 @@ function onKeydown(e: KeyboardEvent) {
 .tip-row strong {
   font-weight: 600;
   color: var(--color-heading);
-}
-.tip-row.muted {
-  color: var(--color-text-muted);
 }
 
 /* Invisible strips over the axis gutters that stretch the axes */

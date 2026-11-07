@@ -283,13 +283,14 @@ const mainSpread = computed(
 /**
  * The charts on screen: the first chart's spread, then (unless hidden) the rolls before it,
  * each the next earlier contract month that has data (months without data are skipped), e.g.
- * Oct26–Nov26, Sep26–Oct26, Jul26–Aug26 … Rolls newer than the first chart's come last.
+ * Oct26–Nov26, Sep26–Oct26, Jul26–Aug26 … Rolls newer than the first chart's are left out;
+ * pick a newer one in the first chart's dropdown to see them.
  */
 const orderedSpreads = computed(() => {
   const main = mainSpread.value
   if (!main) return []
   const at = spreads.value.indexOf(main) // spreads are newest first
-  return [main, ...spreads.value.slice(at + 1), ...spreads.value.slice(0, at)]
+  return [main, ...spreads.value.slice(at + 1)]
 })
 
 /** Charts shown at first, and how many more each "Show more" adds */
@@ -413,7 +414,7 @@ onUnmounted(() => spreadsCtl?.abort())
       <!-- Settings shared by every chart: interval, layout and the days shown -->
       <section class="card controls" aria-label="Chart settings">
         <div class="pickers">
-          <div v-if="spreads.length > 1" ref="rollsEl" class="picker rolls">
+          <div v-if="orderedSpreads.length > 1" ref="rollsEl" class="picker rolls">
             <span id="rolls-label" class="picker-label">Charts</span>
             <button
               type="button"
@@ -423,7 +424,8 @@ onUnmounted(() => spreadsCtl?.abort())
               aria-controls="rolls-menu"
               @click="rollsOpen = !rollsOpen"
             >
-              {{ tickedSpreads.length }} of {{ spreads.length }} shown
+              <!-- Charts actually on screen: ticked ones beyond the first page wait behind "Show more" -->
+              {{ visibleSpreads.length }} of {{ orderedSpreads.length }} shown
               <AppIcon name="chevron-down" :size="16" class="rolls-chev" />
             </button>
             <div
