@@ -2,13 +2,22 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
-import LineChart, { type ChartView, type LinePoint } from '@/components/LineChart.vue'
-import { fetchPriceData, type ProductSpread } from '@/api/priceData'
+import LineChart, {
+  type ChartView,
+  type LinePoint,
+  type VolumeView,
+} from '@/components/LineChart.vue'
+import { fetchPriceData, type PriceBar, type ProductSpread } from '@/api/priceData'
 import { useAutoRetry } from '@/composables/useAutoRetry'
 import { MYT, tradingDayKey } from '@/utils/time'
 
 /** Days shown, shared by every chart on the page: all data, or T-from … T-to (from ≥ to) */
 export type DaySelection = { all: true } | { from: number; to: number }
+
+export type { VolumeView }
+
+/** Share of the chart's height the volume pane takes under the price (the chart doesn't grow) */
+const VOLUME_SHARE = 0.4
 
 /**
  * One chart card: one of the product's spreads, its bars at the page's interval, showing the
@@ -30,8 +39,12 @@ const props = defineProps<{
   height: number
   /** Crosshair key hovered on any chart on the page ("T-2 10:45"), to line this one up */
   hoverKey: string | null
-  /** Draw this spread's fair value on the chart (when it has one) */
+  /** Draw this spread's fair value on the chart (when it has one; price only) */
   showFairValue: boolean
+  /** Volume pane under the close price: off, or AVol up / BVol down */
+  volume: VolumeView
+  /** With the volume pane on: false shows the volume chart alone, without the close price */
+  showPrice: boolean
   /** Interval fixed by the Spreads-page group (for the empty message); null = any */
   fixedInterval: number | null
 }>()
@@ -55,7 +68,13 @@ const DAY_START_HOUR = 6
 
 const chartRef = useTemplateRef<InstanceType<typeof LineChart>>('chart')
 
-const points = ref<LinePoint[]>([])
+const bars = ref<PriceBar[]>([])
+const volumeOn = computed(() => props.volume !== 'off')
+const priceShown = computed(() => !volumeOn.value || props.showPrice)
+/** Close price, with AVol / BVol for the volume pane (files uploaded without them have none) */
+const points = computed<LinePoint[]>(() =>
+  bars.value.map((b) => ({ date: b.timestamp, value: b.close, aVol: b.aVol, bVol: b.bVol })),
+)
 const truncated = ref(false)
 const view = ref<ChartView | null>(null)
 
@@ -105,7 +124,7 @@ async function loadBars() {
   if (!active.value) return
   ctl?.abort()
   if (!props.interval) {
-    points.value = []
+    bars.value = []
     succeed()
     return
   }
@@ -113,7 +132,7 @@ async function loadBars() {
   begin()
   try {
     const res = await fetchPriceData(props.spread.id, props.interval, ctl.signal)
-    points.value = res.data.map((b) => ({ date: b.timestamp, value: b.close }))
+    bars.value = res.data
     truncated.value = res.truncated
     succeed()
   } catch (e) {
@@ -208,7 +227,14 @@ const period = computed(() => {
     </header>
 
     <p class="period">
-      Close<template v-if="period"> · {{ period }}</template>
+      <span v-if="priceShown" class="key"
+        ><span class="swatch line" aria-hidden="true" />Close</span
+      >
+      <template v-if="volumeOn">
+        <span class="key"><span class="swatch" aria-hidden="true" />AVol</span>
+        <span class="key"><span class="swatch b" aria-hidden="true" />BVol</span>
+      </template>
+      <template v-if="period"> · {{ period }}</template>
       <span v-if="truncated"> · most recent bars only</span>
     </p>
 
@@ -218,17 +244,21 @@ const period = computed(() => {
       :height="height"
       :initial-count="initialCount"
       value-label="Close"
+      :volume="volume"
+      :volume-share="VOLUME_SHARE"
+      :show-line="priceShown"
+      volume-empty-text="No AVol / BVol in this data. Re-upload the file with those columns."
       relative-days
       :locked="locked"
       :max-labelled-day="lastDay"
       :day-start-hour="DAY_START_HOUR"
       :display-zone="ZONE"
-      :aria-label="`${product} ${spreadLabel} closing price, ${period}`"
+      :aria-label="`${product} ${spreadLabel} ${[priceShown && 'closing price', volumeOn && 'ask and bid volume'].filter(Boolean).join(' with ')}, ${period}`"
       :loading="loading"
       :error="error"
       :error-hint="errorHint"
       :sync-key="hoverKey"
-      :ref-value="showFairValue ? spread.fairValue : null"
+      :ref-value="showFairValue && priceShown ? spread.fairValue : null"
       ref-label="FV"
       @hover-key="emit('hover-key', $event)"
       @view-change="view = $event"
@@ -325,5 +355,28 @@ select:focus-visible {
   font-size: 0.85rem;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+/* Series key: the close line, then (volume pane on) AVol and BVol bars */
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: 0.6rem;
+}
+.key:last-of-type {
+  margin-right: 0;
+}
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+.swatch.line {
+  width: 14px;
+  height: 3px;
+}
+.swatch.b {
+  background: var(--color-series-2);
 }
 </style>

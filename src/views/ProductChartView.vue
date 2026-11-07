@@ -4,7 +4,10 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import LineChart, { type LinePoint } from '@/components/LineChart.vue'
-import SpreadChartPanel, { type DaySelection } from '@/components/SpreadChartPanel.vue'
+import SpreadChartPanel, {
+  type DaySelection,
+  type VolumeView,
+} from '@/components/SpreadChartPanel.vue'
 import { fetchProductSpreads, type ProductInfo, type ProductSpread } from '@/api/priceData'
 import { SPREAD_SECTIONS } from '@/data/spreads'
 import { useAutoRetry } from '@/composables/useAutoRetry'
@@ -46,6 +49,10 @@ const CHART_HEIGHTS: Record<PerRow, number> = { 1: 260, 2: 240, 3: 220 }
 const perRow = ref<PerRow>(1)
 /** Draw each spread's fair value on its chart */
 const showFairValue = ref(true)
+/** With volume on: also draw the close price above it (false = the volume chart alone) */
+const showPrice = ref(true)
+/** AVol / BVol pane under every chart's close price */
+const volume = ref<VolumeView>('off')
 /** Rolls the viewer has unticked in the Charts dropdown (the first chart always shows) */
 const hiddenIds = ref<string[]>([])
 
@@ -54,7 +61,15 @@ const hiddenIds = ref<string[]>([])
  * only: everything works without it.
  */
 const storageKey = computed(() => `product-chart:${props.product}`)
-function readSaved(): { perRow?: unknown; hidden?: unknown; fairValue?: unknown } {
+function readSaved(): {
+  perRow?: unknown
+  hidden?: unknown
+  fairValue?: unknown
+  price?: unknown
+  volume?: unknown
+  /** Older saves: 'volume' meant the AVol / BVol view */
+  metric?: unknown
+} {
   try {
     const v = JSON.parse(localStorage.getItem(storageKey.value) ?? '{}')
     return v && typeof v === 'object' ? v : {}
@@ -70,13 +85,15 @@ function save() {
         perRow: perRow.value,
         hidden: hiddenIds.value,
         fairValue: showFairValue.value,
+        price: showPrice.value,
+        volume: volume.value,
       }),
     )
   } catch {
     // storage blocked or full: the layout just isn't remembered
   }
 }
-watch([perRow, hiddenIds, showFairValue], save, { deep: true })
+watch([perRow, hiddenIds, showFairValue, showPrice, volume], save, { deep: true })
 
 /* ---------- The product's spreads: one chart each, newest contract month first ---------- */
 
@@ -334,16 +351,48 @@ function tickFirstOnly() {
 
 const rollsOpen = ref(false)
 const rollsEl = ref<HTMLElement | null>(null)
-/** Close on a press outside the dropdown, or Escape */
+/** Compact mode: the drawing options sit behind a Display button */
+const displayOpen = ref(false)
+const displayEl = ref<HTMLElement | null>(null)
+/** Close either dropdown on a press outside it, or Escape (focus returns to its button) */
 function onDocPointer(e: PointerEvent) {
-  if (rollsOpen.value && !rollsEl.value?.contains(e.target as Node)) rollsOpen.value = false
+  const t = e.target as Node
+  if (rollsOpen.value && !rollsEl.value?.contains(t)) rollsOpen.value = false
+  if (displayOpen.value && !displayEl.value?.contains(t)) displayOpen.value = false
 }
 function onDocKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && rollsOpen.value) {
+  if (e.key !== 'Escape') return
+  if (rollsOpen.value) {
     rollsOpen.value = false
-    rollsEl.value?.querySelector<HTMLElement>('.rolls-btn')?.focus()
+    rollsEl.value?.querySelector<HTMLElement>('.menu-btn')?.focus()
+  }
+  if (displayOpen.value) {
+    displayOpen.value = false
+    displayEl.value?.querySelector<HTMLElement>('.menu-btn')?.focus()
   }
 }
+
+/*
+ * Drawing toggles. None disappears when it doesn't apply (so the toolbar never shifts under
+ * the pointer): Price can only be turned off with Volume on (else nothing would show),
+ * and Fair value only applies while the price is drawn.
+ */
+const priceOn = computed(() => volume.value === 'off' || showPrice.value)
+const fairValueOn = computed(() => priceOn.value && showFairValue.value)
+const priceTitle = computed(() =>
+  volume.value === 'off'
+    ? 'Turn Volume on to hide the price and see the volume chart alone'
+    : priceOn.value
+      ? 'Hide the close price: volume chart only'
+      : 'Draw the close price above the volume chart',
+)
+const fairValueTitle = computed(() =>
+  !priceOn.value
+    ? 'Fair value is drawn on the price chart: turn Price on to see it'
+    : fairValueOn.value
+      ? "Hide each spread's fair value line"
+      : "Draw each spread's fair value on its chart",
+)
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer)
   document.addEventListener('keydown', onDocKey)
@@ -373,7 +422,15 @@ watch(
       ? hidden.filter((id): id is string => typeof id === 'string')
       : []
     rollsOpen.value = false
+    displayOpen.value = false
     showFairValue.value = readSaved().fairValue !== false
+    showPrice.value = readSaved().price !== false
+    const { volume: savedVolume, metric: oldMetric } = readSaved()
+    // Any saved volume view (including the removed Imbalance one) opens as AVol / BVol
+    volume.value =
+      (typeof savedVolume === 'string' && savedVolume !== 'off') || oldMetric === 'volume'
+        ? 'sides'
+        : 'off'
     daySel.value = { from: lastDay.value, to: 0 }
     loadSpreads()
   },
@@ -412,30 +469,50 @@ onUnmounted(() => spreadsCtl?.abort())
     </section>
 
     <template v-else>
-      <!-- Settings shared by every chart: interval, layout and the days shown -->
-      <section class="card controls" aria-label="Chart settings">
-        <div class="pickers">
-          <div v-if="orderedSpreads.length > 1" ref="rollsEl" class="picker rolls">
-            <span id="rolls-label" class="picker-label">Charts</span>
+      <!--
+        Settings shared by every chart, in one row: which charts and days on the left, how
+        they're drawn on the right. Compact (narrow) pages tuck the drawing options behind a
+        Display button and pick days from a dropdown.
+      -->
+      <section class="card controls" :class="{ compact }" aria-label="Chart settings">
+        <div class="group">
+          <div v-if="orderedSpreads.length > 1" ref="rollsEl" class="menu">
             <button
               type="button"
-              class="rolls-btn"
+              class="menu-btn"
               aria-haspopup="true"
               :aria-expanded="rollsOpen"
               aria-controls="rolls-menu"
               @click="rollsOpen = !rollsOpen"
             >
               <!-- Charts actually on screen: ticked ones beyond the first page wait behind "Show more" -->
-              {{ visibleSpreads.length }} of {{ orderedSpreads.length }} shown
-              <AppIcon name="chevron-down" :size="16" class="rolls-chev" />
+              <span class="menu-key">Charts</span>
+              {{ visibleSpreads.length }} of {{ orderedSpreads.length }}
+              <AppIcon name="chevron-down" :size="16" class="menu-chev" />
             </button>
-            <div
-              v-if="rollsOpen"
-              id="rolls-menu"
-              class="rolls-menu"
-              role="group"
-              aria-labelledby="rolls-label"
-            >
+            <div v-if="rollsOpen" id="rolls-menu" class="popover" role="group" aria-label="Charts">
+              <!-- Layout lives with the chart list: how many of them sit side by side -->
+              <div v-if="!compact" class="popover-row">
+                <span id="per-row-label" class="popover-label">Per row</span>
+                <div class="seg" role="group" aria-labelledby="per-row-label">
+                  <button
+                    v-for="n in PER_ROW_OPTIONS"
+                    :key="n"
+                    type="button"
+                    :class="{ active: columns === n }"
+                    :aria-pressed="columns === n"
+                    :disabled="n > 1 && visibleSpreads.length < 2"
+                    :title="
+                      n > 1 && visibleSpreads.length < 2
+                        ? 'Tick at least two charts to put them side by side'
+                        : `${n} chart${n > 1 ? 's' : ''} per row`
+                    "
+                    @click="perRow = n"
+                  >
+                    {{ n }}
+                  </button>
+                </div>
+              </div>
               <div class="rolls-actions">
                 <button type="button" @click="tickAll">Show all</button>
                 <button type="button" @click="tickFirstOnly">First only</button>
@@ -459,89 +536,114 @@ onUnmounted(() => spreadsCtl?.abort())
             </div>
           </div>
 
-          <div v-if="!compact && visibleSpreads.length > 1" class="picker">
-            <span id="per-row-label" class="picker-label">Charts per row</span>
-            <div class="seg" role="group" aria-labelledby="per-row-label">
-              <button
-                v-for="n in PER_ROW_OPTIONS"
-                :key="n"
-                type="button"
-                :class="{ active: perRow === n }"
-                :aria-pressed="perRow === n"
-                :title="`${n} chart${n > 1 ? 's' : ''} per row`"
-                @click="perRow = n"
-              >
-                {{ n }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="hasFairValue" class="picker">
-            <span id="fv-label" class="picker-label">Fair value</span>
-            <div class="seg" role="group" aria-labelledby="fv-label">
-              <button
-                type="button"
-                :class="{ active: showFairValue }"
-                :aria-pressed="showFairValue"
-                title="Draw each spread's fair value on its chart"
-                @click="showFairValue = true"
-              >
-                Show
-              </button>
-              <button
-                type="button"
-                :class="{ active: !showFairValue }"
-                :aria-pressed="!showFairValue"
-                title="Hide the fair value lines"
-                @click="showFairValue = false"
-              >
-                Hide
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Small screens: the same choice as a dropdown -->
-        <label v-if="compact && dayOptions.length" class="picker days-picker">
-          <span class="picker-label">Days</span>
-          <span class="select-wrap">
-            <select :value="dayChoice" @change="onDayChoice">
+          <!-- Small screens: the days as a dropdown, on a row of its own -->
+          <span v-if="compact && dayOptions.length" class="select-wrap days-picker">
+            <select :value="dayChoice" aria-label="Days shown" @change="onDayChoice">
               <option v-for="o in dayOptions" :key="o.value" :value="o.value">
                 {{ o.label }}
               </option>
             </select>
             <AppIcon name="chevron-down" :size="16" class="select-chev" />
           </span>
-        </label>
 
-        <div v-if="!compact && chipDays.length" class="ranges" role="group" aria-label="Days shown">
-          <button
-            type="button"
-            title="All data"
-            :class="{ active: allActive }"
-            :aria-pressed="allActive"
-            @click="showAll"
+          <div
+            v-if="!compact && chipDays.length"
+            class="ranges"
+            role="group"
+            aria-label="Days shown"
           >
-            All
-          </button>
-          <span class="divider" aria-hidden="true" />
-          <div class="day-strip" @pointermove="onStripMove">
             <button
-              v-for="t in chipDays"
-              :key="t"
               type="button"
-              :data-day="t"
-              :title="`T-${t} · drag or Shift-click for a range`"
-              :class="{
-                in: inSelection(t),
-                start: inSelection(t) && t === selected?.from,
-                end: inSelection(t) && t === selected?.to,
-              }"
-              :aria-pressed="inSelection(t)"
-              @pointerdown="onChipDown($event, t)"
-              @click="onChipClick($event, t)"
+              title="All data"
+              :class="{ active: allActive }"
+              :aria-pressed="allActive"
+              @click="showAll"
             >
-              T-{{ t }}
+              All
+            </button>
+            <span class="divider" aria-hidden="true" />
+            <div class="day-strip" @pointermove="onStripMove">
+              <button
+                v-for="t in chipDays"
+                :key="t"
+                type="button"
+                :data-day="t"
+                :title="`T-${t} · drag or Shift-click for a range`"
+                :class="{
+                  in: inSelection(t),
+                  start: inSelection(t) && t === selected?.from,
+                  end: inSelection(t) && t === selected?.to,
+                }"
+                :aria-pressed="inSelection(t)"
+                @pointerdown="onChipDown($event, t)"
+                @click="onChipClick($event, t)"
+              >
+                T-{{ t }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div ref="displayEl" class="menu display-wrap">
+          <button
+            v-if="compact"
+            type="button"
+            class="menu-btn"
+            aria-haspopup="true"
+            :aria-expanded="displayOpen"
+            aria-controls="display-options"
+            @click="displayOpen = !displayOpen"
+          >
+            <AppIcon name="settings" :size="16" class="menu-chev" />
+            Display
+          </button>
+          <div
+            v-show="!compact || displayOpen"
+            id="display-options"
+            class="display"
+            :class="{ popover: compact }"
+            role="group"
+            aria-label="Display"
+          >
+            <button
+              type="button"
+              class="chip"
+              :class="{ on: priceOn }"
+              :aria-pressed="priceOn"
+              :disabled="volume === 'off'"
+              :title="priceTitle"
+              @click="showPrice = !showPrice"
+            >
+              <AppIcon name="check" :size="14" :stroke-width="2.5" class="chip-check" />
+              Price
+            </button>
+            <button
+              v-if="hasFairValue"
+              type="button"
+              class="chip"
+              :class="{ on: fairValueOn }"
+              :aria-pressed="fairValueOn"
+              :disabled="!priceOn"
+              :title="fairValueTitle"
+              @click="showFairValue = !showFairValue"
+            >
+              <AppIcon name="check" :size="14" :stroke-width="2.5" class="chip-check" />
+              FV
+            </button>
+            <button
+              type="button"
+              class="chip"
+              :class="{ on: volume !== 'off' }"
+              :aria-pressed="volume !== 'off'"
+              :title="
+                volume !== 'off'
+                  ? 'Hide the volume chart'
+                  : 'Ask volume (AVol) up and bid volume (BVol) down, under the price'
+              "
+              @click="volume = volume === 'off' ? 'sides' : 'off'"
+            >
+              <AppIcon name="check" :size="14" :stroke-width="2.5" class="chip-check" />
+              Volume
             </button>
           </div>
         </div>
@@ -563,6 +665,8 @@ onUnmounted(() => spreadsCtl?.abort())
           :fixed-interval="fixedInterval"
           :hover-key="hoverKey"
           :show-fair-value="showFairValue"
+          :show-price="showPrice"
+          :volume="volume"
           @hover-key="hoverKey = $event"
           @day-count="dayCounts.set(s.id, $event)"
         />
@@ -612,11 +716,30 @@ h1 {
 .controls {
   display: flex;
   margin-bottom: 0.75rem;
-  padding-block: 0.9rem;
+  padding: 0.75rem 1rem;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.6rem 0.75rem;
+}
+/* Each side keeps its controls together; on a narrow page the two sides stack, never split */
+.group,
+.display {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Compact: [Charts] [Display] on the first row, the Days dropdown full width under them */
+.controls.compact .group {
+  display: contents;
+}
+.controls.compact .days-picker {
+  order: 1;
+  flex: 1 1 100%;
+}
+.controls.compact .display-wrap {
+  margin-left: auto;
 }
 
 /* ---------- Chart grid ---------- */
@@ -647,20 +770,6 @@ h1 {
   }
 }
 
-.pickers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-.picker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.picker-label {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
 .select-wrap {
   position: relative;
   display: block;
@@ -698,15 +807,15 @@ select:focus-visible {
   pointer-events: none;
 }
 
-/* ---------- Charts dropdown ---------- */
-.rolls {
+/* ---------- Dropdowns: Charts (list + per row) and, compact, Display ---------- */
+.menu {
   position: relative;
 }
-.rolls-btn {
+.menu-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 2.4rem;
+  min-height: 2.5rem;
   padding: 0.35rem 0.7rem 0.35rem 0.75rem;
   font: inherit;
   font-size: 0.95rem;
@@ -718,14 +827,21 @@ select:focus-visible {
   cursor: pointer;
   white-space: nowrap;
 }
-.rolls-btn:focus-visible {
+.menu-btn:hover {
+  border-color: var(--color-accent-border);
+}
+.menu-btn:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
-.rolls-chev {
+.menu-key {
+  font-size: 0.8rem;
   color: var(--color-text-muted);
 }
-.rolls-menu {
+.menu-chev {
+  color: var(--color-text-muted);
+}
+.popover {
   position: absolute;
   top: calc(100% + 0.35rem);
   left: 0;
@@ -736,6 +852,71 @@ select:focus-visible {
   border-radius: 10px;
   background: var(--color-surface-raised);
   box-shadow: var(--shadow-card);
+}
+.popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.1rem 0.25rem 0.4rem 0.5rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.popover-label {
+  font-size: 0.85rem;
+  color: var(--color-text);
+}
+/* Compact Display menu: opens leftwards from its right-hand button, options stacked */
+.display.popover {
+  left: auto;
+  right: 0;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0.5rem;
+}
+
+/* ---------- Toggle chips (Price, FV): one button, lit when on ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0 0.7rem 0 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border-hover);
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip:hover:not(:disabled) {
+  border-color: var(--color-accent-border);
+}
+.chip.on {
+  color: var(--color-heading);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+}
+/* The tick keeps its space when off, so toggling never shifts the toolbar */
+.chip-check {
+  color: var(--color-accent);
+  visibility: hidden;
+}
+.chip.on .chip-check {
+  visibility: visible;
+}
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 .rolls-actions {
   display: flex;
@@ -865,8 +1046,13 @@ select:focus-visible {
 .seg button {
   min-width: 2.25rem;
 }
+.seg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .ranges button:hover:not(.active):not(.in):not(:disabled),
-.seg button:hover:not(.active) {
+.seg button:hover:not(.active):not(:disabled) {
   background: var(--color-background-mute);
 }
 .ranges button.active,
@@ -923,9 +1109,6 @@ select:focus-visible {
 }
 
 /* Compact mode (narrow page): the Days dropdown takes its own full-width row */
-.days-picker {
-  flex: 1 1 100%;
-}
 .days-picker select {
   width: 100%;
   min-height: 2.75rem; /* comfortable tap target */

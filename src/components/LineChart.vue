@@ -6,7 +6,13 @@ export interface LinePoint {
   /** Daily: YYYY-MM-DD. Intraday: a full ISO timestamp (UTC), e.g. 2026-09-28T02:15:00.000Z */
   date: string
   value: number
+  /** Ask / bid volume of this bar, drawn in the volume pane (see the `volume` prop) */
+  aVol?: number
+  bVol?: number
 }
+
+/** The volume pane under the line: off, or `sides` = AVol bars up and BVol bars down from a shared zero line */
+export type VolumeView = 'off' | 'sides'
 
 /** The slice of `points` currently on screen */
 export interface ChartView {
@@ -35,6 +41,20 @@ const props = withDefaults(
     initialCount?: number
     /** Name of the value in the tooltip, e.g. "Close" */
     valueLabel?: string
+    /** Volume pane under the line, sharing its time axis, pan/zoom and crosshair */
+    volume?: VolumeView
+    /**
+     * Share of the plot's `height` the volume pane takes, at the bottom (the line keeps the rest,
+     * so turning the pane on doesn't make the chart taller)
+     */
+    volumeShare?: number
+    /**
+     * With the volume pane on: false hides the line (and its price axis), so the pane fills the
+     * whole `height` on its own
+     */
+    showLine?: boolean
+    /** Shown in the volume pane when the points on screen have no AVol / BVol */
+    volumeEmptyText?: string
     /** Describes the chart for screen readers */
     ariaLabel?: string
     loading?: boolean
@@ -79,6 +99,10 @@ const props = withDefaults(
   {
     initialCount: 65,
     valueLabel: 'Value',
+    volume: 'off',
+    volumeShare: 0.4,
+    showLine: true,
+    volumeEmptyText: 'No AVol / BVol in this data',
     ariaLabel: 'Line chart',
     loading: false,
     error: null,
@@ -122,6 +146,10 @@ const GUTTER_PX = 40
 const TIME_LABEL_PX = 22
 /** Axis-drag scaling sensitivity per pixel dragged */
 const AXIS_SPEED = 0.005
+/** Space between the line plot and the volume pane, px */
+const PANE_GAP_PX = 14
+/** Share of each bar slot a volume bar fills (the rest is the gap between bars) */
+const BAR_FILL = 0.7
 
 const gradId = `line-area-${useId()}`
 
@@ -135,16 +163,22 @@ const PLACEHOLDER = (() => {
   }
 })()
 const hover = ref<number | null>(null)
+/** The pointer is over the volume pane (not the line plot): the tooltip then shows AVol / BVol */
+const hoverInPane = ref(false)
 const hitEl = ref<HTMLElement | null>(null)
 
 /** Plot width in CSS px, so rotated time labels can be spaced to never overlap */
 const plotEl = ref<HTMLElement | null>(null)
 const plotWidth = ref(800)
+/** Plot height in CSS px (line plot + volume pane), to split it between the two */
+const plotHeight = ref(0)
 let resizeObs: ResizeObserver | undefined
 onMounted(() => {
   if (!plotEl.value || typeof ResizeObserver === 'undefined') return
   resizeObs = new ResizeObserver(([entry]) => {
-    if (entry) plotWidth.value = entry.contentRect.width
+    if (!entry) return
+    plotWidth.value = entry.contentRect.width
+    plotHeight.value = entry.contentRect.height
   })
   resizeObs.observe(plotEl.value)
 })
@@ -216,6 +250,23 @@ const days = computed(() => {
   for (let i = 0; i < keys.length; i++) dayStart[i] = i === 0 || keys[i] !== keys[i - 1]
   return { t, dayStart }
 })
+const isNum = (v: number | undefined): v is number => typeof v === 'number' && Number.isFinite(v)
+
+/**
+ * Per point: AVol + BVol summed from the first bar of its trading day up to and including it
+ * (null until a bar of that day has a volume). A bar missing one side adds just the side it has.
+ */
+const dayVolume = computed(() => {
+  const { dayStart } = days.value
+  let sum: number | null = null
+  return props.points.map((p, i) => {
+    if (dayStart[i]) sum = null
+    if (isNum(p.aVol) || isNum(p.bVol))
+      sum = (sum ?? 0) + (isNum(p.aVol) ? p.aVol : 0) + (isNum(p.bVol) ? p.bVol : 0)
+    return sum
+  })
+})
+
 /** "T-3", or "T-X" for days older than `maxLabelledDay` */
 const dayLabel = (t: number) =>
   props.maxLabelledDay !== null && t > props.maxLabelledDay ? 'T-X' : `T-${t}`
@@ -225,6 +276,24 @@ const tLabel = (i: number) => dayLabel(days.value.t[i]!)
 const refLevel = computed(() =>
   typeof props.refValue === 'number' && Number.isFinite(props.refValue) ? props.refValue : null,
 )
+
+/* ---------- Volume pane ---------- */
+
+const volumeOn = computed(() => props.volume !== 'off')
+/** Volume pane alone: no line, the pane takes the whole plot */
+const lineHidden = computed(() => volumeOn.value && !props.showLine)
+/**
+ * Vertical split of the SVG's H units: the line plot is 0…lineH, the volume pane paneTop…H.
+ * Measured from the plot's real height, so it holds when phones cap the line plot's height.
+ */
+const bands = computed(() => {
+  if (!volumeOn.value) return { lineH: H, paneTop: H }
+  if (lineHidden.value) return { lineH: 0, paneTop: 0 }
+  const total = plotHeight.value || props.height
+  const paneTop = H * (1 - clamp(props.volumeShare, 0.1, 0.9))
+  return { lineH: paneTop - (H * PANE_GAP_PX) / total, paneTop }
+})
+const volFmt = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 
 /* ---------- Crosshair sync between charts ---------- */
 
@@ -375,7 +444,9 @@ const chart = computed(() => {
     min -= pad
     max += pad
   }
-  const y = (val: number) => (1 - (val - min) / (max - min)) * H
+  // The line plot fills the top band; the volume pane (when on) sits below it
+  const { lineH, paneTop } = bands.value
+  const y = (val: number) => (1 - (val - min) / (max - min)) * lineH
   const pct = (u: number, total: number) => `${((u / total) * 100).toFixed(3)}%`
 
   const step = niceStep(max - min, 4)
@@ -453,7 +524,9 @@ const chart = computed(() => {
   let line = ''
   for (let i = i0; i <= i1; i++)
     line += `${i > i0 ? 'L' : 'M'}${x(i).toFixed(1)},${y(pts[i]!.value).toFixed(1)} `
-  const area = `${line}L${x(i1).toFixed(1)},${H} L${x(i0).toFixed(1)},${H} Z`
+  const area = `${line}L${x(i1).toFixed(1)},${lineH.toFixed(1)} L${x(i0).toFixed(1)},${lineH.toFixed(1)} Z`
+
+  const pane = volumeOn.value ? volumePane(i0, i1, x, (W / width) * BAR_FILL, paneTop, pct) : null
 
   const last = pts[n - 1]!
   return {
@@ -467,29 +540,88 @@ const chart = computed(() => {
     axisSeps,
     line,
     area,
+    pane,
+    lineH,
     yTicks,
     xTicks,
     // The latest value stays on the right axis even when panned into the past
     // Reference line, when it falls within the plot (a manual y range can push it off)
     ref:
-      refLevel.value !== null && y(refLevel.value) >= 0 && y(refLevel.value) <= H
+      refLevel.value !== null && y(refLevel.value) >= 0 && y(refLevel.value) <= lineH
         ? {
             d: `M0 ${y(refLevel.value).toFixed(1)} H${W}`,
             top: pct(y(refLevel.value), H),
             label: `${props.refLabel ? `${props.refLabel} ` : ''}${valueFmt.format(refLevel.value)}`,
           }
         : null,
-    lastTag: { label: valueFmt.format(last.value), top: pct(clamp(y(last.value), 0, H), H) },
+    lastTag: { label: valueFmt.format(last.value), top: pct(clamp(y(last.value), 0, lineH), H) },
     atLatest: v.end >= n - 0.51,
     at: (i: number) => ({
       left: pct(x(i), W),
       top: pct(y(pts[i]!.value), H),
       fx: x(i) / W,
       // false when a manual y range has pushed the point off the plot
-      inside: y(pts[i]!.value) >= 0 && y(pts[i]!.value) <= H,
+      inside: y(pts[i]!.value) >= 0 && y(pts[i]!.value) <= lineH,
     }),
   }
 })
+
+/**
+ * Bars of the volume pane for points i0…i1, in SVG units: `up` paths rise from the zero line,
+ * `down` paths hang below it: AVol up, BVol down, both on one scale (the larger of the two on
+ * screen), so their lengths compare directly.
+ */
+function volumePane(
+  i0: number,
+  i1: number,
+  x: (i: number) => number,
+  barW: number,
+  top: number,
+  pct: (u: number, total: number) => string,
+) {
+  const pts = props.points
+  // A sliver of room so the tallest bar doesn't touch the pane's edge
+  const pad = (H - top) * 0.04
+  const mid = (top + H) / 2
+  const half = mid - top - pad
+  const bar = (i: number, len: number, dir: 1 | -1) => {
+    const x0 = (x(i) - barW / 2).toFixed(1)
+    return `M${x0},${mid.toFixed(1)} v${(-dir * len).toFixed(2)} h${barW.toFixed(2)} v${(dir * len).toFixed(2)} Z `
+  }
+
+  let up = ''
+  let down = ''
+  let scale = 0
+  for (let i = i0; i <= i1; i++) {
+    const { aVol, bVol } = pts[i]!
+    if (isNum(aVol)) scale = Math.max(scale, aVol)
+    if (isNum(bVol)) scale = Math.max(scale, bVol)
+  }
+  if (scale > 0)
+    for (let i = i0; i <= i1; i++) {
+      const { aVol, bVol } = pts[i]!
+      if (isNum(aVol) && aVol > 0) up += bar(i, (aVol / scale) * half, 1)
+      if (isNum(bVol) && bVol > 0) down += bar(i, (bVol / scale) * half, -1)
+    }
+
+  return {
+    empty: scale === 0,
+    up,
+    down,
+    frame: `M0 ${top.toFixed(1)} H${W}`,
+    zero: `M0 ${mid.toFixed(1)} H${W}`,
+    // Pane's own axis: top and bottom of the scale, zero in the middle
+    ticks: [
+      { key: 'top', label: volFmt.format(scale), top: pct(mid - half, H) },
+      { key: 'zero', label: '0', top: pct(mid, H) },
+      { key: 'bot', label: volFmt.format(scale), top: pct(mid + half, H) },
+    ],
+    // Direct labels for the up and down halves, in the right gutter
+    upLabel: 'AVol',
+    downLabel: 'BVol',
+    middle: pct(mid, H),
+  }
+}
 
 /** Blur the chart: while loading, on error, or when there's nothing to plot */
 const veiled = computed(() => props.loading || !!props.error || !chart.value)
@@ -513,15 +645,36 @@ const tip = computed(() => {
   const when = intraday.value
     ? `${fmt.value.tipDate.format(d)} · ${fmt.value.timeOfDay.format(d)} ${zone.value.label}`
     : fmt.value.tipDate.format(d)
+  // Over the volume pane: the volume readout; over the line: its value. Crosshairs mirrored from
+  // another chart show the line's value (unless this chart shows the pane alone).
+  const synced = shown.value!.synced
+  const inPane = lineHidden.value || (volumeOn.value && hoverInPane.value && !synced)
   return {
     ...pos,
-    synced: shown.value!.synced,
+    synced,
+    inPane,
     // Right of the crosshair if it fits, else left, else (very narrow plots) centred on top
     side: tooltipSide(pos.fx),
     // With T-n labels: the trading day as the heading, the actual date and time beneath it
     date: props.relativeDays ? tLabel(i) : when,
     when: props.relativeDays ? when : '',
     value: valueFmt.format(p.value),
+    // Over the line: volume traded so far that day, from its first bar to this one (needs AVol / BVol)
+    dayVol: (() => {
+      const total = dayVolume.value[i]
+      if (inPane || total == null) return null
+      return {
+        label: intraday.value ? 'Day vol' : 'Vol',
+        value: valueFmt.format(total),
+      }
+    })(),
+    // Over the volume pane: both sides of this bar
+    vol: inPane
+      ? {
+          a: isNum(p.aVol) ? valueFmt.format(p.aVol) : '–',
+          b: isNum(p.bVol) ? valueFmt.format(p.bVol) : '–',
+        }
+      : null,
   }
 })
 
@@ -536,8 +689,13 @@ let drag: {
 } | null = null
 const dragging = ref(false)
 
-function plotFraction(clientX: number) {
+function plotFraction(clientX: number, clientY?: number) {
   const rect = hitEl.value!.getBoundingClientRect()
+  if (clientY !== undefined && volumeOn.value) {
+    // Split at the middle of the gap between the line plot and the volume pane
+    const { lineH, paneTop } = bands.value
+    hoverInPane.value = ((clientY - rect.top) / rect.height) * H >= (lineH + paneTop) / 2
+  }
   return { fx: (clientX - rect.left) / rect.width, width: rect.width, height: rect.height }
 }
 
@@ -553,7 +711,7 @@ function onPointerDown(e: PointerEvent) {
   if (e.button !== 0 || !view.value) return
   if (props.locked) {
     // No panning: a tap just shows the tooltip for the bar under the finger
-    updateHover(plotFraction(e.clientX).fx)
+    updateHover(plotFraction(e.clientX, e.clientY).fx)
     return
   }
   hitEl.value?.setPointerCapture(e.pointerId)
@@ -568,13 +726,13 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onPointerMove(e: PointerEvent) {
-  const { fx, width, height } = plotFraction(e.clientX)
+  const { fx, width, height } = plotFraction(e.clientX, e.clientY)
   if (drag) {
     setView(drag.start - ((e.clientX - drag.x) / width) * drag.span, drag.span)
     // With a manual price range, dragging also pans up and down (auto scale has nothing to pan)
     const r = drag.yRange
     if (r) {
-      const shift = ((e.clientY - drag.y) / height) * (r.max - r.min)
+      const shift = ((e.clientY - drag.y) / ((height * bands.value.lineH) / H)) * (r.max - r.min)
       yRange.value = { min: r.min + shift, max: r.max + shift }
     }
   }
@@ -600,7 +758,7 @@ function onWheel(e: WheelEvent) {
   let dx = e.deltaX * unit
   let dy = e.deltaY * unit
   if (e.shiftKey && !dx) [dx, dy] = [dy, 0] // shift + wheel pans
-  const { fx, width } = plotFraction(e.clientX)
+  const { fx, width } = plotFraction(e.clientX, e.clientY)
   // Horizontal scroll (trackpad swipe) pans; vertical scroll and pinch zoom
   if (Math.abs(dx) > Math.abs(dy)) panBy(dx / width)
   else zoomBy(Math.exp(dy * ZOOM_SPEED), clamp(fx, 0, 1))
@@ -702,7 +860,12 @@ function onKeydown(e: KeyboardEvent) {
       <!-- Everything drawn lives in the stage, which is blurred while loading, on error, or with no data -->
       <div class="stage" :class="{ veiled: veiled }" :inert="veiled || undefined">
         <template v-if="chart">
-          <span v-for="t in chart.yTicks" :key="t.label" class="y-tick" :style="{ top: t.top }">
+          <span
+            v-for="t in lineHidden ? [] : chart.yTicks"
+            :key="t.label"
+            class="y-tick"
+            :style="{ top: t.top }"
+          >
             {{ t.label }}
           </span>
           <div class="x-axis">
@@ -733,12 +896,33 @@ function onKeydown(e: KeyboardEvent) {
               :style="{ left: sep.left }"
             />
           </div>
-          <span v-if="chart.ref" class="ref-tag" :style="{ top: chart.ref.top }">{{
+          <span v-if="chart.ref && !lineHidden" class="ref-tag" :style="{ top: chart.ref.top }">{{
             chart.ref.label
           }}</span>
-          <span class="last-tag" :style="{ top: chart.lastTag.top }">{{
+          <span v-if="!lineHidden" class="last-tag" :style="{ top: chart.lastTag.top }">{{
             chart.lastTag.label
           }}</span>
+          <template v-if="chart.pane">
+            <template v-if="!chart.pane.empty">
+              <span
+                v-for="t in chart.pane.ticks"
+                :key="`vol-${t.key}`"
+                class="y-tick vol-tick"
+                :style="{ top: t.top }"
+                >{{ t.label }}</span
+              >
+              <!-- Direct labels in the right gutter, beside the half of the pane each side fills -->
+              <span class="vol-label" :style="{ top: chart.pane.ticks[0]!.top }">
+                <span class="vol-swatch" aria-hidden="true" />{{ chart.pane.upLabel }}
+              </span>
+              <span class="vol-label" :style="{ top: chart.pane.ticks[2]!.top }">
+                <span class="vol-swatch b" aria-hidden="true" />{{ chart.pane.downLabel }}
+              </span>
+            </template>
+            <span v-else class="vol-empty" :style="{ top: chart.pane.middle }">{{
+              volumeEmptyText
+            }}</span>
+          </template>
 
           <svg
             class="svg"
@@ -753,11 +937,19 @@ function onKeydown(e: KeyboardEvent) {
                 <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0" />
               </linearGradient>
             </defs>
-            <path class="grid" :d="chart.grid" />
-            <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
-            <path :d="chart.area" :fill="`url(#${gradId})`" />
-            <path class="line" :d="chart.line" />
-            <path v-if="chart.ref" class="ref-line" :d="chart.ref.d" />
+            <template v-if="!lineHidden">
+              <path class="grid" :d="chart.grid" />
+              <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
+              <path :d="chart.area" :fill="`url(#${gradId})`" />
+              <path class="line" :d="chart.line" />
+              <path v-if="chart.ref" class="ref-line" :d="chart.ref.d" />
+            </template>
+            <g v-if="chart.pane">
+              <path v-if="!lineHidden" class="grid" :d="chart.pane.frame" />
+              <path class="vol-bar" :d="chart.pane.up" />
+              <path class="vol-bar b" :d="chart.pane.down" />
+              <path v-if="!chart.pane.empty" class="vol-zero" :d="chart.pane.zero" />
+            </g>
           </svg>
 
           <div
@@ -780,7 +972,11 @@ function onKeydown(e: KeyboardEvent) {
           >
             <template v-if="tip">
               <div class="crosshair" :style="{ left: tip.left }" />
-              <div v-if="tip.inside" class="dot" :style="{ left: tip.left, top: tip.top }" />
+              <div
+                v-if="tip.inside && !tip.inPane"
+                class="dot"
+                :style="{ left: tip.left, top: tip.top }"
+              />
               <div
                 class="tooltip"
                 :class="[tip.side, { synced: tip.synced }]"
@@ -788,10 +984,24 @@ function onKeydown(e: KeyboardEvent) {
               >
                 <span class="tip-date">{{ tip.date }}</span>
                 <span v-if="tip.when" class="tip-when">{{ tip.when }}</span>
-                <span class="tip-row">
+                <span v-if="!tip.inPane" class="tip-row">
                   <span>{{ valueLabel }}</span
                   ><strong>{{ tip.value }}</strong>
                 </span>
+                <span v-if="tip.dayVol" class="tip-row">
+                  <span>{{ tip.dayVol.label }}</span
+                  ><strong>{{ tip.dayVol.value }}</strong>
+                </span>
+                <template v-if="tip.vol">
+                  <span class="tip-row">
+                    <span><span class="vol-swatch" aria-hidden="true" />AVol</span
+                    ><strong>{{ tip.vol.a }}</strong>
+                  </span>
+                  <span class="tip-row">
+                    <span><span class="vol-swatch b" aria-hidden="true" />BVol</span
+                    ><strong>{{ tip.vol.b }}</strong>
+                  </span>
+                </template>
               </div>
             </template>
           </div>
@@ -799,7 +1009,7 @@ function onKeydown(e: KeyboardEvent) {
           <!-- Axis handles: drag or scroll to stretch, double-click to reset (price: auto fit; time: default view) -->
           <template v-if="!locked">
             <div
-              v-for="side in ['left', 'right']"
+              v-for="side in lineHidden ? [] : ['left', 'right']"
               :key="side"
               class="axis-hit y"
               :class="side"
@@ -824,7 +1034,7 @@ function onKeydown(e: KeyboardEvent) {
           </template>
 
           <button
-            v-if="yRange && !locked"
+            v-if="yRange && !locked && !lineHidden"
             type="button"
             class="auto-scale"
             title="Fit the price axis to the data on screen"
@@ -896,6 +1106,7 @@ function onKeydown(e: KeyboardEvent) {
 
 .plot {
   position: relative;
+  /* the line plot, and the volume pane under it when that's on, share this height */
   height: var(--plot-h, 360px);
 }
 
@@ -936,6 +1147,58 @@ function onKeydown(e: KeyboardEvent) {
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+}
+
+/* Volume pane: AVol in the line's accent, BVol in the second-series colour */
+.vol-bar {
+  fill: var(--color-accent);
+  opacity: 0.85;
+}
+.vol-bar.b {
+  fill: var(--color-series-2);
+}
+.vol-zero {
+  fill: none;
+  stroke: var(--color-border-hover);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.vol-tick {
+  font-size: 0.72rem;
+}
+.vol-label,
+.vol-empty {
+  position: absolute;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.vol-label {
+  left: calc(100% + 0.6rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transform: translateY(-50%);
+  line-height: 1.2;
+}
+.vol-empty {
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.vol-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 0.35rem;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+.vol-label .vol-swatch {
+  margin-right: 0;
+}
+.vol-swatch.b {
+  background: var(--color-series-2);
 }
 
 .ref-line {
