@@ -1,5 +1,13 @@
 import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
 
+/** Which part of the Spreads page a product belongs to */
+export type ProductType = 'indices' | 'commodities'
+
+export const PRODUCT_TYPES: { value: ProductType; label: string }[] = [
+  { value: 'indices', label: 'Indices' },
+  { value: 'commodities', label: 'Commodities' },
+]
+
 /** A new product record for the database, as entered on the admin page */
 export interface NewProduct {
   /** e.g. "1x6" */
@@ -8,6 +16,7 @@ export interface NewProduct {
   exchange: string
   /** 3-letter ISO code, e.g. "JPY" */
   currency: string
+  productType: ProductType
 }
 
 interface CreateProductResponse {
@@ -17,7 +26,7 @@ interface CreateProductResponse {
 
 /**
  * POST /api/create-product
- * Body: { "name": "1x6", "exchange": "JPX", "currency": "JPY" }
+ * Body: { "name": "1x6", "exchange": "JPX", "currency": "JPY", "productType": "indices" }
  *
  * Resolves with the saved product. Rejects with a message to show the admin: the server's
  * `message` or `error` field when it sends one (e.g. for a duplicate product), else a generic one.
@@ -31,11 +40,12 @@ export async function createProduct(
     res = await fetch(`${API_BASE_URL}/api/create-product`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Exactly these three fields, whatever else the object carries
+      // Exactly these fields, whatever else the object carries
       body: JSON.stringify({
         name: product.name,
         exchange: product.exchange,
         currency: product.currency,
+        productType: product.productType,
       }),
       signal,
     })
@@ -104,15 +114,24 @@ export interface ManagedProduct {
   name: string
   exchange: string
   currency: string
+  /** Missing on products created before the field existed */
+  productType?: ProductType
   /** Newest contracts first */
   spreads: ManagedSpread[]
 }
 
-/** GET /api/products — every product with all its spreads (with or without price data) */
-export async function fetchManagedProducts(signal?: AbortSignal): Promise<ManagedProduct[]> {
+/**
+ * GET /api/products[?productType=indices] — products with all their spreads (with or without
+ * price data); only products of `productType` when it's given
+ */
+export async function fetchManagedProducts(
+  productType?: ProductType,
+  signal?: AbortSignal,
+): Promise<ManagedProduct[]> {
+  const qs = productType ? `?productType=${encodeURIComponent(productType)}` : ''
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/products`, { signal })
+    res = await fetch(`${API_BASE_URL}/api/products${qs}`, { signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     throw new Error(NETWORK_ERROR)

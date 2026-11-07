@@ -2,7 +2,7 @@
 import { computed, nextTick, reactive, ref, useId, watch } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
-import { createProduct, type NewProduct } from '@/api/products'
+import { PRODUCT_TYPES, createProduct, type NewProduct, type ProductType } from '@/api/products'
 
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ created: [product: NewProduct] }>()
@@ -32,7 +32,7 @@ const CURRENCIES = [
   { code: 'EUR', name: 'Euro' },
 ]
 
-const blank = () => ({ name: '', exchange: '', currency: '' })
+const blank = () => ({ name: '', productType: '' as ProductType | '', exchange: '', currency: '' })
 
 const form = reactive(blank())
 const submitted = ref(false)
@@ -46,6 +46,7 @@ const firstField = ref<HTMLInputElement | null>(null)
 const errors = computed(() => {
   const e: Partial<Record<keyof typeof form, string>> = {}
   if (!form.name.trim()) e.name = 'Enter a product name.'
+  if (!form.productType) e.productType = 'Choose a product type.'
   if (!form.exchange) e.exchange = 'Choose an exchange.'
   if (!form.currency) e.currency = 'Choose a currency.'
   return e
@@ -77,6 +78,7 @@ async function submit() {
       name: form.name.trim(),
       exchange: form.exchange,
       currency: form.currency,
+      productType: form.productType as ProductType,
     })
     emit('created', created.value)
   } catch (e) {
@@ -104,7 +106,12 @@ async function addAnother() {
     <div v-if="created" class="done" role="status">
       <span class="done-icon"><AppIcon name="check" :size="28" :stroke-width="2.5" /></span>
       <p class="done-title">{{ created.name }} added</p>
-      <p class="sub">{{ created.exchange }} · {{ created.currency }}</p>
+      <p class="sub">
+        {{
+          PRODUCT_TYPES.find((t) => t.value === created!.productType)?.label ?? created.productType
+        }}
+        · {{ created.exchange }} · {{ created.currency }}
+      </p>
       <div class="actions">
         <button type="button" class="btn" @click="addAnother">Add another</button>
         <button type="button" class="btn primary" @click="open = false">Done</button>
@@ -131,6 +138,23 @@ async function addAnother() {
             {{ showError('name') }}
           </p>
         </div>
+
+        <fieldset
+          class="field"
+          :aria-invalid="!!showError('productType')"
+          :aria-describedby="showError('productType') ? id('type-err') : undefined"
+        >
+          <legend>Product type</legend>
+          <div class="seg">
+            <label v-for="t in PRODUCT_TYPES" :key="t.value" class="seg-option">
+              <input v-model="form.productType" type="radio" :name="id('type')" :value="t.value" />
+              <span>{{ t.label }}</span>
+            </label>
+          </div>
+          <p v-if="showError('productType')" :id="id('type-err')" class="error">
+            {{ showError('productType') }}
+          </p>
+        </fieldset>
 
         <div class="row">
           <div class="field">
@@ -190,3 +214,68 @@ async function addAnother() {
     </form>
   </AppDialog>
 </template>
+
+<style scoped>
+/* Product type: two options side by side, styled like the inputs around them */
+fieldset.field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  margin-bottom: 0.35rem;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-heading);
+}
+
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border-hover);
+  border-radius: 8px;
+}
+
+fieldset[aria-invalid='true'] .seg {
+  border-color: #e5484d;
+}
+
+.seg-option {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.seg-option:hover {
+  background: var(--color-background-mute);
+}
+
+.seg-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.seg-option:has(input:checked) {
+  background: var(--color-accent-solid);
+  color: var(--color-on-accent);
+  font-weight: 500;
+}
+
+.seg-option:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+</style>

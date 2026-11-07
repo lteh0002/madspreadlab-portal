@@ -23,7 +23,8 @@ async function load() {
   controller = new AbortController()
   begin()
   try {
-    products.value = await fetchManagedProducts(controller.signal)
+    // This page manages index spreads only
+    products.value = await fetchManagedProducts('indices', controller.signal)
     for (const p of products.value) for (const s of p.spreads) resetRow(s)
     succeed()
   } catch (e) {
@@ -298,8 +299,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
     </div>
 
     <div v-else-if="products.length === 0" class="state">
-      <p class="state-title">No products yet</p>
-      <p class="state-hint">Add one from the Admin page.</p>
+      <p class="state-title">No index products yet</p>
+      <p class="state-hint">Add one from the Admin page with Product type set to Indices.</p>
     </div>
 
     <template v-else>
