@@ -1,12 +1,4 @@
-/** Market a product is shown under; sets its badge text and colour on the calendar */
-export type Market = 'MY' | 'SG' | 'IN' | 'HK'
-
-export interface Expiry {
-  product: string
-  market: Market
-  /** Last trading day, YYYY-MM-DD */
-  ltd: string
-}
+import type { ProductExpiryRule } from '@/api/products'
 
 export interface Closure {
   /** YYYY-MM-DD */
@@ -19,13 +11,19 @@ export interface Closure {
 
 export type CalendarEvent =
   | { kind: 'closure'; label: string }
-  | { kind: 'expiry'; product: string; market: Market; label: string; isLtd: boolean }
+  | { kind: 'expiry'; product: string; market: string; label: string; isLtd: boolean }
 
-/** T-n days shown before each last trading day */
-const T_DAYS_SHOWN = 4
+/** T-n days shown before expiry when a product doesn't set its own `tDays` */
+const DEFAULT_T_DAYS = 5
 
-/** Within a day, products appear in this order. To add a month, add its expiries and closures. */
-export const EXPIRIES: Expiry[] = []
+/** Badge text on the calendar; an exchange not listed here shows its own code */
+const MARKET_BY_EXCHANGE: Record<string, string> = {
+  BMD: 'MY',
+  SGX: 'SG',
+  HKEX: 'HK',
+  TAIFEX: 'TW',
+  JPX: 'JP',
+}
 
 export const CLOSURES: Closure[] = []
 
@@ -40,28 +38,49 @@ export function isWeekend(day: string): boolean {
   return weekday === 0 || weekday === 6
 }
 
-/** The `count` trading days before `ltd`, nearest first, skipping weekends and the product's closures */
-function tradingDaysBefore(ltd: string, count: number, product: string): string[] {
+function isTradingDay(day: string, product: string): boolean {
+  return !isWeekend(day) && !CLOSURES.some((c) => c.date === day && c.products?.includes(product))
+}
+
+/** The `count` trading days strictly before `day`, nearest first */
+function tradingDaysBefore(day: string, count: number, product: string): string[] {
   const days: string[] = []
-  for (let day = shiftDay(ltd, -1); days.length < count; day = shiftDay(day, -1)) {
-    const closed = CLOSURES.some((c) => c.date === day && c.products?.includes(product))
-    if (!isWeekend(day) && !closed) days.push(day)
-  }
+  for (let d = shiftDay(day, -1); days.length < count; d = shiftDay(d, -1))
+    if (isTradingDay(d, product)) days.push(d)
   return days
 }
 
-/** Everything on the calendar, keyed by YYYY-MM-DD. Closures come first within a day. */
-export function calendarEvents(): Map<string, CalendarEvent[]> {
+/** The product's expiry in `month` (YYYY-MM): its n-th last trading day */
+function expiryDay(month: string, n: number, product: string): string {
+  const nextMonth = new Date(
+    Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 1),
+  ).toISOString()
+  return tradingDaysBefore(nextMonth.slice(0, 10), n, product)[n - 1]!
+}
+
+/**
+ * Everything on the calendar for `months` (YYYY-MM), keyed by YYYY-MM-DD. Closures come first
+ * within a day, then products in the order given. Pass the following month too: the run-up to
+ * an expiry early in a month starts in the month before it.
+ */
+export function calendarEvents(
+  rules: ProductExpiryRule[],
+  months: string[],
+): Map<string, CalendarEvent[]> {
   const byDay = new Map<string, CalendarEvent[]>()
   const add = (day: string, event: CalendarEvent) =>
     byDay.set(day, [...(byDay.get(day) ?? []), event])
 
   for (const c of CLOSURES) add(c.date, { kind: 'closure', label: c.label })
-  for (const { product, market, ltd } of EXPIRIES) {
-    add(ltd, { kind: 'expiry', product, market, label: 'LTD', isLtd: true })
-    tradingDaysBefore(ltd, T_DAYS_SHOWN, product).forEach((day, i) =>
-      add(day, { kind: 'expiry', product, market, label: `T-${i + 1}`, isLtd: false }),
-    )
+  for (const { name: product, exchange, expiryRule, tDays } of rules) {
+    const market = MARKET_BY_EXCHANGE[exchange] ?? exchange
+    for (const month of months) {
+      const expiry = expiryDay(month, expiryRule.n, product)
+      add(expiry, { kind: 'expiry', product, market, label: 'T-0', isLtd: true })
+      tradingDaysBefore(expiry, tDays ?? DEFAULT_T_DAYS, product).forEach((day, i) =>
+        add(day, { kind: 'expiry', product, market, label: `T-${i + 1}`, isLtd: false }),
+      )
+    }
   }
   return byDay
 }

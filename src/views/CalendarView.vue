@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import { fetchExpiryRules, type ProductExpiryRule } from '@/api/products'
 import { calendarEvents, isWeekend } from '@/data/calendar'
+import { useAutoRetry } from '@/composables/useAutoRetry'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { MYT, dayKey } from '@/utils/time'
 
@@ -9,7 +11,25 @@ usePageTitle('Calendar')
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-const events = calendarEvents()
+const rules = ref<ProductExpiryRule[]>([])
+let controller: AbortController | undefined
+const { error, errorHint, begin, succeed, fail } = useAutoRetry(load)
+
+async function load() {
+  controller?.abort()
+  controller = new AbortController()
+  begin()
+  try {
+    rules.value = await fetchExpiryRules(controller.signal)
+    succeed()
+  } catch (e) {
+    if ((e as Error).name !== 'AbortError') fail(e)
+  }
+}
+
+onMounted(load)
+onUnmounted(() => controller?.abort())
+
 const today = dayKey(new Date().toISOString(), MYT.zone)
 const currentMonth = today.slice(0, 7)
 
@@ -30,6 +50,10 @@ const monthFmt = new Intl.DateTimeFormat('en-GB', {
 })
 const monthTitle = computed(() => monthFmt.format(monthStart(0)))
 
+const events = computed(() =>
+  calendarEvents(rules.value, [month.value, monthStart(1).toISOString().slice(0, 7)]),
+)
+
 /** Empty cells before the 1st, so it lands under its weekday (weeks start on Monday) */
 const leadingBlanks = computed(() => (monthStart(0).getUTCDay() + 6) % 7)
 
@@ -38,7 +62,7 @@ const days = computed(() => {
   return Array.from({ length: count }, (_, i) => {
     const key = `${month.value}-${String(i + 1).padStart(2, '0')}`
     const weekday = WEEKDAYS[(leadingBlanks.value + i) % 7]!
-    return { key, n: i + 1, weekday, weekend: isWeekend(key), events: events.get(key) ?? [] }
+    return { key, n: i + 1, weekday, weekend: isWeekend(key), events: events.value.get(key) ?? [] }
   })
 })
 
@@ -76,6 +100,11 @@ const monthEmpty = computed(() => days.value.every((d) => !d.events.length))
       </div>
     </div>
 
+    <p v-if="error" class="load-error" role="alert">
+      Couldn't load expiries: {{ error }} {{ errorHint }}
+      <button type="button" class="btn sm" @click="load">Retry now</button>
+    </p>
+
     <div class="weekdays" aria-hidden="true">
       <span v-for="w in WEEKDAYS" :key="w">{{ w }}</span>
     </div>
@@ -100,6 +129,7 @@ const monthEmpty = computed(() => days.value.every((d) => !d.events.length))
               <span class="label">{{ e.label }}</span>
             </li>
             <li v-else class="event" :class="[e.market.toLowerCase(), { ltd: e.isLtd }]">
+              <span class="market">{{ e.market }}</span>
               <span class="label">{{ e.product }} {{ e.label }}</span>
             </li>
           </template>
@@ -256,6 +286,24 @@ h2 {
 .event.closure .label {
   font-weight: 600;
   white-space: normal;
+}
+.market {
+  flex: none;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  background: var(--market);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  color: var(--color-heading);
 }
 
 @container (max-width: 820px) {

@@ -142,6 +142,30 @@ export async function fetchManagedProducts(
   return body.data ?? []
 }
 
+/** A product on the calendar and how its expiry date is worked out */
+export interface ProductExpiryRule {
+  name: string
+  exchange: string
+  /** nthLastTradingDay: n = 1 is the month's last trading day, 2 the one before it */
+  expiryRule: { type: 'nthLastTradingDay'; n: number }
+  /** Trading days shown before expiry: 5 = T-5 … T-0 */
+  tDays?: number
+}
+
+/** GET /api/expiry-rules — the products that have an expiry rule */
+export async function fetchExpiryRules(signal?: AbortSignal): Promise<ProductExpiryRule[]> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/api/expiry-rules`, { signal })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    throw new Error(NETWORK_ERROR)
+  }
+  if (!res.ok) throw new Error(await errorMessage(res))
+  const body = (await res.json()) as { data?: ProductExpiryRule[] }
+  return body.data ?? []
+}
+
 /**
  * PATCH /api/spreads/:id/fair-value   Body: { fairValue: number | null }
  * Sets a spread's fair value, or clears it with null. Resolves with the value as saved.
