@@ -39,6 +39,11 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/calendar',
+      name: 'calendar',
+      component: () => import('../views/CalendarView.vue'),
+    },
+    {
       // NOTE: not protected yet. Admin actions must be checked server-side once they exist.
       path: '/admin',
       name: 'admin',
