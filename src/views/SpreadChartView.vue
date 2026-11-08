@@ -106,7 +106,7 @@ onUnmounted(() => controller?.abort())
         @view-change="view = $event"
         @retry="load"
       />
-      <p class="hint">Drag to pan · scroll to zoom</p>
+      <p class="hint">Drag to pan · Ctrl/⌘ + scroll or pinch to zoom</p>
     </section>
   </main>
 </template>

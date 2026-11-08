@@ -751,21 +751,26 @@ function onPointerLeave(e: PointerEvent) {
   if (!drag) hover.value = null
 }
 
+/** Ctrl or Cmd held while scrolling. Browsers also report a trackpad pinch as Ctrl + wheel. */
+const isZoomGesture = (e: WheelEvent) => e.ctrlKey || e.metaKey
+
 function onWheel(e: WheelEvent) {
   if (!view.value || props.locked) return // locked: let the page scroll
-  e.preventDefault() // the chart owns the wheel, like TradingView
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
   let dx = e.deltaX * unit
   let dy = e.deltaY * unit
   if (e.shiftKey && !dx) [dx, dy] = [dy, 0] // shift + wheel pans
+  const pan = Math.abs(dx) > Math.abs(dy)
+  if (!pan && !isZoomGesture(e)) return // a plain vertical scroll moves the page
+  e.preventDefault() // also stops the browser's own page zoom on Ctrl + wheel
   const { fx, width } = plotFraction(e.clientX, e.clientY)
-  // Horizontal scroll (trackpad swipe) pans; vertical scroll and pinch zoom
-  if (Math.abs(dx) > Math.abs(dy)) panBy(dx / width)
+  // Horizontal scroll (trackpad swipe) pans; Ctrl/Cmd + vertical scroll and pinch zoom
+  if (pan) panBy(dx / width)
   else zoomBy(Math.exp(dy * ZOOM_SPEED), clamp(fx, 0, 1))
   updateHover(fx)
 }
 
-/* ---------- Axis scaling: drag or scroll on an axis to stretch it, double-click to reset ---------- */
+/* ---------- Axis scaling: drag or Ctrl/Cmd + scroll on an axis to stretch it, double-click to reset ---------- */
 
 let axisDrag:
   | { kind: 'y'; pos: number; min: number; max: number }
@@ -812,7 +817,7 @@ function onAxisUp(e: PointerEvent) {
 
 function onAxisWheel(e: WheelEvent, kind: 'x' | 'y') {
   const c = chart.value
-  if (!c || props.locked) return
+  if (!c || props.locked || !isZoomGesture(e)) return // a plain scroll moves the page
   e.preventDefault()
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
   const delta = (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * unit
@@ -960,7 +965,7 @@ function onKeydown(e: KeyboardEvent) {
             :aria-label="
               locked
                 ? undefined
-                : 'Chart. Drag or use the arrow keys to pan; scroll or press + and − to zoom; Home and End jump to the oldest and newest data; Page Up and Page Down stretch the price axis, A resets it.'
+                : 'Chart. Drag or use the arrow keys to pan; hold Ctrl or Command and scroll, pinch, or press + and − to zoom; Home and End jump to the oldest and newest data; Page Up and Page Down stretch the price axis, A resets it.'
             "
             @pointerdown="onPointerDown"
             @pointermove="onPointerMove"
@@ -1006,7 +1011,7 @@ function onKeydown(e: KeyboardEvent) {
             </template>
           </div>
 
-          <!-- Axis handles: drag or scroll to stretch, double-click to reset (price: auto fit; time: default view) -->
+          <!-- Axis handles: drag or Ctrl/Cmd + scroll to stretch, double-click to reset (price: auto fit; time: default view) -->
           <template v-if="!locked">
             <div
               v-for="side in lineHidden ? [] : ['left', 'right']"
