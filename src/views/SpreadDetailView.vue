@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import SpreadTable, { type DailyCashRow } from '@/components/SpreadTable.vue'
 import { fetchJpxCash, type JpxCashQuery, type JpxCashRecord } from '@/api/jpxCash'
 import { findSpread } from '@/data/spreads'
+import { formatDate } from '@/utils/time'
 
 const props = defineProps<{ spreadName: string }>()
 
@@ -60,8 +61,10 @@ const rows = computed<DailyCashRow[]>(() => {
 const summary = computed(() => {
   if (loading.value || error.value) return ''
   const n = rows.value.length
-  const days = `${n} day${n === 1 ? '' : 's'}`
-  return range.value ? `${days} from ${range.value.from} to ${range.value.to}` : `Latest ${days}`
+  const days = `${n} trading day${n === 1 ? '' : 's'}`
+  return range.value
+    ? `${days} from ${formatDate(range.value.from)} to ${formatDate(range.value.to)}`
+    : `Latest ${days}`
 })
 
 function stopRetryTimer() {
@@ -145,7 +148,7 @@ onUnmounted(() => {
       </label>
       <button type="submit" class="btn primary" :disabled="rangeInvalid">Show</button>
       <button v-if="range" type="button" class="btn" @click="resetRange">
-        Latest {{ LATEST_DAYS }} days
+        Latest {{ LATEST_DAYS }} trading days
       </button>
       <span class="summary">{{ summary }}</span>
     </form>

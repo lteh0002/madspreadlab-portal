@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatDate } from '@/utils/time'
 
 export interface DailyCashRow {
   /** YYYY-MM-DD */
@@ -58,7 +59,7 @@ const showSkeleton = computed(() => props.loading || !!props.error)
       </tbody>
       <tbody v-else>
         <tr v-for="row in rows" :key="row.date">
-          <td>{{ row.date }}</td>
+          <td>{{ formatDate(row.date) }}</td>
           <td>{{ row.day }}</td>
           <td v-for="s in sessions" :key="s" class="num" :class="cellClass(row.sessions[s])">
             {{ row.sessions[s] === undefined ? '—' : fmt.format(row.sessions[s]!) }}

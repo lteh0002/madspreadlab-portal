@@ -10,6 +10,12 @@ export const UTC: DisplayZone = { zone: 'UTC', label: 'UTC' }
 /** Malaysia time, UTC+8 (no daylight saving) */
 export const MYT: DisplayZone = { zone: 'Asia/Kuala_Lumpur', label: 'MYT' }
 
+/** A calendar day for display: "2026-11-06" → "06/11/2026" */
+export function formatDate(day: string): string {
+  const [year, month, date] = day.split('-')
+  return `${date}/${month}/${year}`
+}
+
 const dayFormatters = new Map<string, Intl.DateTimeFormat>()
 
 /**
