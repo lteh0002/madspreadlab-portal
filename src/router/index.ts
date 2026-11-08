@@ -20,13 +20,6 @@ const router = createRouter({
       component: () => import('../views/FairValueView.vue'),
     },
     {
-      // static /spreads/index-roll/fair-value above takes precedence over this
-      path: '/spreads/index-roll/:market',
-      name: 'index-roll',
-      component: () => import('../views/IndexRollView.vue'),
-      props: true,
-    },
-    {
       // Price chart from the database (price_data), e.g. /spreads/products/MCA
       path: '/spreads/products/:product',
       name: 'product-chart',

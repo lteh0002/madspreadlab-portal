@@ -226,6 +226,7 @@ const period = computed(() => {
       </span>
     </header>
 
+    <!-- Series key, then (after a divider) the days and bars on screen -->
     <p class="period">
       <span v-if="priceShown" class="key"
         ><span class="swatch line" aria-hidden="true" />Close</span
@@ -234,8 +235,9 @@ const period = computed(() => {
         <span class="key"><span class="swatch" aria-hidden="true" />AVol</span>
         <span class="key"><span class="swatch b" aria-hidden="true" />BVol</span>
       </template>
-      <template v-if="period"> · {{ period }}</template>
-      <span v-if="truncated"> · most recent bars only</span>
+      <span v-if="period || truncated" class="meta">
+        {{ period }}<template v-if="truncated"> · most recent bars only</template>
+      </span>
     </p>
 
     <LineChart
@@ -351,8 +353,13 @@ select:focus-visible {
 }
 
 .period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.85rem;
   margin: 0.5rem 0 0.25rem;
   font-size: 0.85rem;
+  line-height: 1.3;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -360,13 +367,15 @@ select:focus-visible {
 .key {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-right: 0.6rem;
+  gap: 0.4rem;
 }
-.key:last-of-type {
-  margin-right: 0;
+/* Days and bars on screen, set off from the key by a thin divider */
+.meta {
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--color-border-hover);
 }
 .swatch {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 2px;

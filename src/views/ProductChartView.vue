@@ -51,24 +51,23 @@ const perRow = ref<PerRow>(1)
 const showFairValue = ref(true)
 /** With volume on: also draw the close price above it (false = the volume chart alone) */
 const showPrice = ref(true)
-/** AVol / BVol pane under every chart's close price */
+/**
+ * AVol / BVol pane under every chart's close price. Off whenever the page opens (not remembered),
+ * like the Price toggle that goes with it: turn it on when needed.
+ */
 const volume = ref<VolumeView>('off')
 /** Rolls the viewer has unticked in the Charts dropdown (the first chart always shows) */
 const hiddenIds = ref<string[]>([])
 
 /*
- * The viewer's charts-per-row choice is remembered per product in this browser. A convenience
- * only: everything works without it.
+ * The viewer's layout (charts per row, hidden rolls, fair value) is remembered per product in
+ * this browser. A convenience only: everything works without it. Volume and Price aren't saved.
  */
 const storageKey = computed(() => `product-chart:${props.product}`)
 function readSaved(): {
   perRow?: unknown
   hidden?: unknown
   fairValue?: unknown
-  price?: unknown
-  volume?: unknown
-  /** Older saves: 'volume' meant the AVol / BVol view */
-  metric?: unknown
 } {
   try {
     const v = JSON.parse(localStorage.getItem(storageKey.value) ?? '{}')
@@ -85,15 +84,13 @@ function save() {
         perRow: perRow.value,
         hidden: hiddenIds.value,
         fairValue: showFairValue.value,
-        price: showPrice.value,
-        volume: volume.value,
       }),
     )
   } catch {
     // storage blocked or full: the layout just isn't remembered
   }
 }
-watch([perRow, hiddenIds, showFairValue, showPrice, volume], save, { deep: true })
+watch([perRow, hiddenIds, showFairValue], save, { deep: true })
 
 /* ---------- The product's spreads: one chart each, newest contract month first ---------- */
 
@@ -424,13 +421,8 @@ watch(
     rollsOpen.value = false
     displayOpen.value = false
     showFairValue.value = readSaved().fairValue !== false
-    showPrice.value = readSaved().price !== false
-    const { volume: savedVolume, metric: oldMetric } = readSaved()
-    // Any saved volume view (including the removed Imbalance one) opens as AVol / BVol
-    volume.value =
-      (typeof savedVolume === 'string' && savedVolume !== 'off') || oldMetric === 'volume'
-        ? 'sides'
-        : 'off'
+    showPrice.value = true
+    volume.value = 'off'
     daySel.value = { from: lastDay.value, to: 0 }
     loadSpreads()
   },

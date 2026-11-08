@@ -125,7 +125,7 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             name: 'roll-mca',
             label: 'MCA Roll',
             pageTitle: 'MCA Index Roll',
-            // Opens the price chart from the database (price_data), not the index-roll placeholder
+            // Opens the price chart from the database (price_data), like the other rolls
             routeName: 'product-chart',
             routeParams: { product: 'MCA' },
             description: 'MCA index roll',

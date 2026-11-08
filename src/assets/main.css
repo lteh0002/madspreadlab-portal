@@ -5,8 +5,7 @@
   font-weight: normal;
 }
 
-a,
-.green {
+a {
   text-decoration: none;
   color: var(--color-accent);
   transition: 0.4s;
