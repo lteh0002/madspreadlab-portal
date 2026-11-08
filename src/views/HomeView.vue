@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { usePageTitle } from '@/composables/usePageTitle'
+
+usePageTitle('Multi-asset historical price action & analytics')
 </script>
 
 <template>

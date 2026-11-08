@@ -11,6 +11,7 @@ import SpreadChartPanel, {
 import { fetchProductSpreads, type ProductInfo, type ProductSpread } from '@/api/priceData'
 import { SPREAD_SECTIONS } from '@/data/spreads'
 import { useAutoRetry } from '@/composables/useAutoRetry'
+import { usePageTitle } from '@/composables/usePageTitle'
 
 /** Product name as stored in the database, e.g. "MCA" */
 const props = defineProps<{ product: string }>()
@@ -30,6 +31,7 @@ const card = computed(() => {
   return null
 })
 const title = computed(() => card.value?.spread.pageTitle ?? `${props.product} Chart`)
+usePageTitle(title)
 /** Interval fixed by the card's group (e.g. 15 min for Index Roll); null = any */
 const fixedInterval = computed(() => card.value?.interval ?? null)
 

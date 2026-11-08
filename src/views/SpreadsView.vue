@@ -4,6 +4,9 @@ import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { SPREAD_SECTIONS, type SpreadInfo } from '@/data/spreads'
 import { supportsFlagEmoji } from '@/composables/flagEmoji'
+import { usePageTitle } from '@/composables/usePageTitle'
+
+usePageTitle('Spreads')
 
 /** Windows etc. can't draw flag emoji — show the text badge (SGP, FKLI…) there instead */
 const showEmoji = supportsFlagEmoji()

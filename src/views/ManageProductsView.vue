@@ -10,7 +10,10 @@ import {
   type ManagedSpread,
 } from '@/api/products'
 import { useAutoRetry } from '@/composables/useAutoRetry'
+import { usePageTitle } from '@/composables/usePageTitle'
 import { MYT, dayKey } from '@/utils/time'
+
+usePageTitle('Manage indices spreads')
 
 const route = useRoute()
 const router = useRouter()

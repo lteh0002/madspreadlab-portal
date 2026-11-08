@@ -5,12 +5,15 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { fetchFairValues, type ProductFairValues } from '@/api/fairValue'
 import { useAutoRetry } from '@/composables/useAutoRetry'
+import { usePageTitle } from '@/composables/usePageTitle'
 import { MYT, dayKey } from '@/utils/time'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const FUTURES_MONTH_CODES = ['F', 'G', 'H', 'J', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']
 /** Most decimals a column shows, however many the stored values have */
 const MAX_DECIMALS = 4
+
+usePageTitle('Fair Value')
 
 const route = useRoute()
 const router = useRouter()

@@ -5,6 +5,7 @@ import SpreadTable, { type DailyCashRow } from '@/components/SpreadTable.vue'
 import { fetchJpxCash, type JpxCashQuery, type JpxCashRecord } from '@/api/jpxCash'
 import { findSpread } from '@/data/spreads'
 import { formatDate } from '@/utils/time'
+import { usePageTitle } from '@/composables/usePageTitle'
 
 const props = defineProps<{ spreadName: string }>()
 
@@ -30,6 +31,7 @@ const title = computed(() => {
   const spread = findSpread(props.spreadName)
   return spread?.pageTitle ?? `${spread?.label ?? props.spreadName} Cash Values`
 })
+usePageTitle(title)
 
 const errorHint = computed(() =>
   retryIn.value > 0 ? `Retrying in ${retryIn.value}s…` : 'Retrying…',

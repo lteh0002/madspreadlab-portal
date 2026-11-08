@@ -7,23 +7,19 @@ import { useTheme } from '@/composables/useTheme'
 interface NavItem {
   label: string
   icon: IconName
-  /** Path prefix this item owns; omitted = not built yet */
-  to?: string
+  /** Path prefix this item owns */
+  to: string
 }
 
 const NAV: NavItem[] = [
   { label: 'Spreads', icon: 'grid', to: '/spreads' },
-  { label: 'Research', icon: 'file-solid' },
-  { label: 'Analytics', icon: 'bars-solid' },
-  { label: 'Watchlist', icon: 'star' },
-  { label: 'Settings', icon: 'settings-solid' },
   { label: 'Admin', icon: 'shield-solid', to: '/admin' },
 ]
 
 const route = useRoute()
 const { theme, toggle } = useTheme()
 
-const isActive = (item: NavItem) => !!item.to && route.path.startsWith(item.to)
+const isActive = (item: NavItem) => route.path.startsWith(item.to)
 const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' : 'dark'} mode`)
 </script>
 
@@ -43,22 +39,17 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
       </RouterLink>
 
       <nav class="nav" aria-label="Main">
-        <template v-for="item in NAV" :key="item.label">
-          <RouterLink
-            v-if="item.to"
-            :to="item.to"
-            class="nav-item"
-            :class="{ active: isActive(item) }"
-            :aria-current="isActive(item) ? 'page' : undefined"
-          >
-            <AppIcon :name="item.icon" :size="22" />
-            <span class="nav-label">{{ item.label }}</span>
-          </RouterLink>
-          <span v-else class="nav-item disabled" title="Coming soon" aria-disabled="true">
-            <AppIcon :name="item.icon" :size="22" />
-            <span class="nav-label">{{ item.label }}</span>
-          </span>
-        </template>
+        <RouterLink
+          v-for="item in NAV"
+          :key="item.label"
+          :to="item.to"
+          class="nav-item"
+          :class="{ active: isActive(item) }"
+          :aria-current="isActive(item) ? 'page' : undefined"
+        >
+          <AppIcon :name="item.icon" :size="22" />
+          <span class="nav-label">{{ item.label }}</span>
+        </RouterLink>
       </nav>
 
       <RouterLink to="/spreads" class="promo" aria-label="Browse spreads">
@@ -171,19 +162,11 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 .nav-item.active:hover {
   color: var(--color-on-accent);
 }
-.nav-item.disabled {
-  cursor: default;
-  opacity: 0.8;
-}
 .nav-item :deep(svg) {
   color: var(--color-text);
 }
 .nav-item.active :deep(svg) {
   color: var(--color-on-accent);
-}
-.nav-item.disabled:hover {
-  background: transparent;
-  color: var(--color-text);
 }
 
 .promo {
@@ -297,7 +280,8 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
     flex-direction: row;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.6rem 3.75rem 0.6rem 1rem;
+    /* right: clear the fixed theme toggle (its 1rem offset + 42px width) plus a gap */
+    padding: 0.6rem calc(1rem + 42px + 0.5rem) 0.6rem 1rem;
     border-right: 0;
     border-bottom: 1px solid var(--color-border);
     /* translucent so page artwork shows through as it scrolls under */

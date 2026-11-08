@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import AddProductDialog from '@/components/AddProductDialog.vue'
 import UploadDataDialog from '@/components/UploadDataDialog.vue'
+import { usePageTitle } from '@/composables/usePageTitle'
 
 interface AdminOption {
   title: string
@@ -14,6 +15,8 @@ interface AdminOption {
   /** Opens a pop-up instead of a page */
   onSelect?: () => void
 }
+
+usePageTitle('Admin')
 
 const addProductOpen = ref(false)
 const uploadDataOpen = ref(false)

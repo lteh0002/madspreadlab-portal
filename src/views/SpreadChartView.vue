@@ -4,6 +4,7 @@ import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import LineChart, { type ChartView, type LinePoint } from '@/components/LineChart.vue'
 import { fetchSpreadCloses } from '@/api/spreadChart'
 import { findSpread } from '@/data/spreads'
+import { usePageTitle } from '@/composables/usePageTitle'
 
 const props = defineProps<{ spreadName: string }>()
 
@@ -26,6 +27,7 @@ let controller: AbortController | undefined
 
 const spread = computed(() => findSpread(`${props.spreadName}-chart`))
 const title = computed(() => spread.value?.pageTitle ?? `${props.spreadName} Chart`)
+usePageTitle(title)
 const shortName = computed(() => spread.value?.label?.replace(/ Chart$/, '') ?? props.spreadName)
 
 /** A range button is lit only while the window exactly matches it (any pan or zoom clears it) */
