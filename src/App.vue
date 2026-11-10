@@ -27,7 +27,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 <template>
   <div class="shell">
     <aside class="sidebar">
-      <RouterLink to="/" class="brand" aria-label="MadSpreadLab home">
+      <div class="brand">
         <svg class="logo" viewBox="0 0 40 32" aria-hidden="true">
           <rect x="2" y="22" width="5" height="8" rx="1" />
           <rect x="10" y="17" width="5" height="13" rx="1" />
@@ -37,7 +37,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
           <path d="M29 2 H35 V8" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         <span class="brand-text">MadSpread<span class="brand-accent">Lab</span></span>
-      </RouterLink>
+      </div>
 
       <nav class="nav" aria-label="Main">
         <RouterLink
@@ -107,9 +107,6 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
   margin-bottom: -0.25rem;
   border-radius: 0;
   border-bottom: 1px solid var(--color-border);
-}
-.brand:hover {
-  background: transparent;
 }
 
 .logo {
