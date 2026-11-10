@@ -2,6 +2,7 @@
  * Shared buttons. Use these instead of per-component button styles.
  *   .btn           secondary (outlined)
  *   .btn.primary   main action (solid accent)
+ *   .btn.danger    destructive action (solid red)
  *   .btn.ghost     low-emphasis (no border until hover)
  *   .btn.sm        compact size, e.g. inline "Retry"
  * Works on <button> and on links (<a>/<RouterLink>).
@@ -54,6 +55,16 @@
 .btn.primary:hover:not(:disabled) {
   border-color: transparent;
   background: color-mix(in srgb, var(--color-accent-solid) 85%, #000);
+}
+
+.btn.danger {
+  border-color: transparent;
+  background: #c62828;
+  color: #fff;
+}
+.btn.danger:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, #c62828 85%, #000);
 }
 
 .btn.ghost {

@@ -191,3 +191,23 @@ export async function setSpreadFairValue(
   const body = (await res.json().catch(() => ({}))) as { data?: { fairValue?: number | null } }
   return body.data?.fairValue ?? fairValue
 }
+
+/**
+ * DELETE /api/spreads/:id
+ * Permanently removes a spread and its price data. Resolves with the number of bars deleted.
+ */
+export async function deleteSpread(spreadId: string, signal?: AbortSignal): Promise<number> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/api/spreads/${encodeURIComponent(spreadId)}`, {
+      method: 'DELETE',
+      signal,
+    })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    throw new Error(NETWORK_ERROR)
+  }
+  if (!res.ok) throw new Error(await errorMessage(res))
+  const body = (await res.json()) as { data: { barsDeleted: number } }
+  return body.data.barsDeleted
+}

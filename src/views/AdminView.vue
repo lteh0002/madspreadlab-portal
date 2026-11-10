@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import AddProductDialog from '@/components/AddProductDialog.vue'
 import UploadDataDialog from '@/components/UploadDataDialog.vue'
+import DeleteSpreadDialog from '@/components/DeleteSpreadDialog.vue'
 import { usePageTitle } from '@/composables/usePageTitle'
 
 interface AdminOption {
@@ -20,6 +21,7 @@ usePageTitle('Admin')
 
 const addProductOpen = ref(false)
 const uploadDataOpen = ref(false)
+const deleteSpreadOpen = ref(false)
 
 /**
  * Settings shown on the admin page, in sections. To enable one, set `to` (its own page) or
@@ -43,6 +45,12 @@ const PRODUCT_OPTIONS: AdminOption[] = [
     description: "See each index's spreads and set their fair values.",
     icon: 'list',
     to: '/admin/products',
+  },
+  {
+    title: 'Delete spread',
+    description: 'Permanently remove a spread and its price data.',
+    icon: 'trash',
+    onSelect: () => (deleteSpreadOpen.value = true),
   },
 ]
 
@@ -116,6 +124,7 @@ const SECTIONS = [
 
     <AddProductDialog v-model:open="addProductOpen" />
     <UploadDataDialog v-model:open="uploadDataOpen" />
+    <DeleteSpreadDialog v-model:open="deleteSpreadOpen" />
   </main>
 </template>
 
