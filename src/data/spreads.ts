@@ -19,6 +19,8 @@ export interface SpreadInfo {
   badge?: string
   /** Extra tags shown on the card (the section title is always shown first) */
   tags?: string[]
+  /** Shows the card with a "Soon" pill and no link, until its page or data exists */
+  comingSoon?: boolean
 }
 
 /** Find a spread by its `name` (the URL segment) */
@@ -56,6 +58,44 @@ export interface SpreadSection {
   groups: SpreadGroup[]
 }
 
+/** A commodity's category: the same three views for each product. Not built yet, so all "Soon" */
+function commodityGroup(product: string): SpreadGroup {
+  const slug = product.toLowerCase()
+  return {
+    title: product,
+    spreads: [
+      {
+        name: `${slug}-term-structure`,
+        label: 'Term Structure',
+        description: 'Futures curve across contract months',
+        badge: product,
+        tags: ['Term Structure'],
+        comingSoon: true,
+      },
+      {
+        name: `${slug}-butterfly`,
+        label: 'Butterfly',
+        description: 'Butterflies across contract months',
+        badge: product,
+        tags: ['Butterfly'],
+        comingSoon: true,
+      },
+      {
+        name: `${slug}-spreads`,
+        label: 'Spreads',
+        pageTitle: `${product} Spreads`,
+        // Same price chart page as the index rolls; needs the product and its data in the database
+        routeName: 'product-chart',
+        routeParams: { product },
+        description: 'Calendar spreads between contract months',
+        badge: product,
+        tags: ['Spreads'],
+        comingSoon: true,
+      },
+    ],
+  }
+}
+
 /**
  * Layout of the /spreads landing page.
  * To add a button, add a spread to the relevant group's `spreads` list.
@@ -66,8 +106,7 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
   {
     title: 'Commodities',
     icon: 'database',
-    emptyText: 'Commodity spreads are currently being developed.',
-    groups: [{ title: '', spreads: [] }],
+    groups: [commodityGroup('FCPO'), commodityGroup('TF')],
   },
   {
     title: 'Indices',

@@ -375,11 +375,13 @@ function onSearchKeydown(e: KeyboardEvent) {
                       the bottom. Tags aren't shown (the section, flag and name already say them);
                       search and the filter still use them.
                     -->
-                    <RouterLink
+                    <component
+                      :is="s.comingSoon ? 'div' : RouterLink"
                       v-for="s in group.spreads"
                       :key="s.name"
-                      :to="spreadTo(s)"
+                      v-bind="s.comingSoon ? {} : { to: spreadTo(s) }"
                       class="card"
+                      :class="{ soon: s.comingSoon }"
                     >
                       <div class="card-top">
                         <div
@@ -394,13 +396,14 @@ function onSearchKeydown(e: KeyboardEvent) {
                           <template v-else-if="s.badge">{{ s.badge }}</template>
                           <AppIcon v-else name="trend" :size="26" :stroke-width="2.5" />
                         </div>
-                        <AppIcon name="arrow" :size="18" :stroke-width="2" class="go" />
+                        <span v-if="s.comingSoon" class="soon-pill">Soon</span>
+                        <AppIcon v-else name="arrow" :size="18" :stroke-width="2" class="go" />
                       </div>
                       <div class="card-text">
                         <span class="card-title">{{ s.label ?? s.name }}</span>
                         <span v-if="s.description" class="card-desc">{{ s.description }}</span>
                       </div>
-                    </RouterLink>
+                    </component>
                   </div>
                 </div>
               </div>
@@ -862,6 +865,19 @@ h3 {
 .card:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
+}
+/* Not a link yet: no hover lift */
+.card.soon:hover {
+  border-color: var(--color-border-hover);
+  transform: none;
+}
+.soon-pill {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--color-border-hover);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
 }
 
 .card-top {
