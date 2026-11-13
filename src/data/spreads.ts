@@ -59,7 +59,8 @@ export interface SpreadSection {
 }
 
 /**
- * A product's category: the same three views for each product. Not built yet, so all "Soon".
+ * A product's category: the same three views for each product. Term Structure and Butterfly
+ * have no page yet, so they show "Soon".
  * `dbProduct` is the product's name in the database when it differs from the name shown
  * (e.g. FTW is stored as TWN).
  */
@@ -94,7 +95,6 @@ function commodityGroup(product: string, dbProduct = product): SpreadGroup {
         description: 'Calendar spreads between contract months',
         badge: product,
         tags: ['Spreads'],
-        comingSoon: true,
       },
     ],
   }
@@ -163,8 +163,6 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             emoji: '🇹🇼',
             badge: 'MTW',
             tags: ['Taiwan'],
-            // Remove once the MTW product and its 15-min data are uploaded
-            comingSoon: true,
           },
           {
             name: 'roll-fkli',
@@ -213,8 +211,6 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             emoji: '🇨🇳',
             badge: 'CN',
             tags: ['China'],
-            // Remove once the CN product and its 15-min data are uploaded
-            comingSoon: true,
           },
         ],
       },

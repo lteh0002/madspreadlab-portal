@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import { useTheme } from '@/composables/useTheme'
+import logoUrl from '@/assets/logo.png'
 
 interface NavItem {
   label: string
@@ -29,14 +30,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
   <div class="shell">
     <aside class="sidebar">
       <div class="brand">
-        <svg class="logo" viewBox="0 0 40 32" aria-hidden="true">
-          <rect x="2" y="22" width="5" height="8" rx="1" />
-          <rect x="10" y="17" width="5" height="13" rx="1" />
-          <rect x="18" y="12" width="5" height="18" rx="1" />
-          <rect x="26" y="7" width="5" height="23" rx="1" />
-          <path d="M3 15 L14 8 L21 11 L35 2" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M29 2 H35 V8" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
+        <img class="logo" :src="logoUrl" alt="" width="40" height="40" />
         <span class="brand-text">MadSpread<span class="brand-accent">Lab</span></span>
       </div>
 
@@ -111,10 +105,9 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 }
 
 .logo {
-  width: 38px;
-  height: 30px;
-  fill: var(--color-accent);
-  stroke: var(--color-accent);
+  flex: none;
+  width: 40px;
+  height: 40px;
 }
 
 .brand-text {

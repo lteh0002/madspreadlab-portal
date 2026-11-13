@@ -48,7 +48,9 @@ const PER_ROW_OPTIONS: PerRow[] = [1, 2, 3]
 /** Plot height in px by charts per row; kept compact so several fit on screen */
 const CHART_HEIGHTS: Record<PerRow, number> = { 1: 260, 2: 240, 3: 220 }
 
-const perRow = ref<PerRow>(1)
+/** Charts per row until the viewer picks another for the product */
+const DEFAULT_PER_ROW: PerRow = 2
+const perRow = ref<PerRow>(DEFAULT_PER_ROW)
 /** Draw each spread's fair value on its chart */
 const showFairValue = ref(true)
 /** With volume on: also draw the close price above it (false = the volume chart alone) */
@@ -415,7 +417,7 @@ watch(
     info.value = null
     dayCounts.clear()
     const saved = Number(readSaved().perRow)
-    perRow.value = PER_ROW_OPTIONS.includes(saved as PerRow) ? (saved as PerRow) : 1
+    perRow.value = PER_ROW_OPTIONS.includes(saved as PerRow) ? (saved as PerRow) : DEFAULT_PER_ROW
     const hidden = readSaved().hidden
     hiddenIds.value = Array.isArray(hidden)
       ? hidden.filter((id): id is string => typeof id === 'string')
