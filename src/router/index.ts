@@ -42,6 +42,11 @@ const router = createRouter({
       component: () => import('../views/CalendarView.vue'),
     },
     {
+      path: '/research',
+      name: 'research',
+      component: () => import('../views/ResearchView.vue'),
+    },
+    {
       // NOTE: not protected yet. Admin actions must be checked server-side once they exist.
       path: '/admin',
       name: 'admin',

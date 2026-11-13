@@ -1,4 +1,4 @@
-import type { ProductExpiryRule } from '@/api/products'
+import type { ExpiryRule, ProductExpiryRule } from '@/api/products'
 
 export interface Closure {
   /** YYYY-MM-DD */
@@ -50,12 +50,27 @@ function tradingDaysBefore(day: string, count: number, product: string): string[
   return days
 }
 
-/** The product's expiry in `month` (YYYY-MM): its n-th last trading day */
-function expiryDay(month: string, n: number, product: string): string {
-  const nextMonth = new Date(
-    Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 1),
-  ).toISOString()
-  return tradingDaysBefore(nextMonth.slice(0, 10), n, product)[n - 1]!
+/**
+ * Expiry rules set here win over the ones from the API, until the backend returns them.
+ * MCA: 3rd Friday of the month.
+ */
+const EXPIRY_RULE_OVERRIDES: Record<string, ExpiryRule> = {
+  MCA: { type: 'nthWeekday', n: 3, weekday: 5 },
+}
+
+/** The product's expiry day in `month` (YYYY-MM) under `rule` */
+function expiryDay(month: string, rule: ExpiryRule, product: string): string {
+  const year = Number(month.slice(0, 4))
+  const monthIndex = Number(month.slice(5)) - 1
+  if (rule.type === 'nthWeekday') {
+    const firstWeekday = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay()
+    const date = 1 + ((rule.weekday - firstWeekday + 7) % 7) + (rule.n - 1) * 7
+    const day = new Date(Date.UTC(year, monthIndex, date)).toISOString().slice(0, 10)
+    // A holiday on the expiry day moves it to the trading day before
+    return isTradingDay(day, product) ? day : tradingDaysBefore(day, 1, product)[0]!
+  }
+  const nextMonth = new Date(Date.UTC(year, monthIndex + 1, 1)).toISOString()
+  return tradingDaysBefore(nextMonth.slice(0, 10), rule.n, product)[rule.n - 1]!
 }
 
 /**
@@ -75,7 +90,7 @@ export function calendarEvents(
   for (const { name: product, exchange, expiryRule, tDays } of rules) {
     const market = MARKET_BY_EXCHANGE[exchange] ?? exchange
     for (const month of months) {
-      const expiry = expiryDay(month, expiryRule.n, product)
+      const expiry = expiryDay(month, EXPIRY_RULE_OVERRIDES[product] ?? expiryRule, product)
       add(expiry, { kind: 'expiry', product, market, label: 'T-0', isLtd: true })
       tradingDaysBefore(expiry, tDays ?? DEFAULT_T_DAYS, product).forEach((day, i) =>
         add(day, { kind: 'expiry', product, market, label: `T-${i + 1}`, isLtd: false }),

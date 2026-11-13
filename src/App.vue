@@ -14,6 +14,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: 'Spreads', icon: 'grid', to: '/spreads' },
   { label: 'Calendar', icon: 'calendar-solid', to: '/calendar' },
+  { label: 'Research', icon: 'flask-solid', to: '/research' },
   { label: 'Admin', icon: 'shield-solid', to: '/admin' },
 ]
 

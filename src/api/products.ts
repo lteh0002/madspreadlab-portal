@@ -142,12 +142,21 @@ export async function fetchManagedProducts(
   return body.data ?? []
 }
 
+/**
+ * How a product's expiry day in a month is worked out:
+ * - nthLastTradingDay: n = 1 is the month's last trading day, 2 the one before it
+ * - nthWeekday: the n-th `weekday` of the month (0 = Sunday … 5 = Friday), e.g. 3rd Friday;
+ *   if that day isn't a trading day, the trading day before it
+ */
+export type ExpiryRule =
+  | { type: 'nthLastTradingDay'; n: number }
+  | { type: 'nthWeekday'; n: number; weekday: number }
+
 /** A product on the calendar and how its expiry date is worked out */
 export interface ProductExpiryRule {
   name: string
   exchange: string
-  /** nthLastTradingDay: n = 1 is the month's last trading day, 2 the one before it */
-  expiryRule: { type: 'nthLastTradingDay'; n: number }
+  expiryRule: ExpiryRule
   /** Trading days shown before expiry: 5 = T-5 … T-0 */
   tDays?: number
 }
