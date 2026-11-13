@@ -6,6 +6,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import LineChart, { type LinePoint } from '@/components/LineChart.vue'
 import SpreadChartPanel, {
   type DaySelection,
+  type PriceStyle,
   type VolumeView,
 } from '@/components/SpreadChartPanel.vue'
 import { fetchProductSpreads, type ProductInfo, type ProductSpread } from '@/api/priceData'
@@ -53,6 +54,12 @@ const DEFAULT_PER_ROW: PerRow = 2
 const perRow = ref<PerRow>(DEFAULT_PER_ROW)
 /** Draw each spread's fair value on its chart */
 const showFairValue = ref(true)
+/** Price drawn as a line through the closes, or as OHLC candles (remembered per product) */
+const priceStyle = ref<PriceStyle>('line')
+const PRICE_STYLES: { value: PriceStyle; label: string; title: string }[] = [
+  { value: 'line', label: 'Line', title: 'Line through each bar’s close' },
+  { value: 'candles', label: 'Candles', title: 'Candlesticks: open, high, low and close' },
+]
 /** With volume on: also draw the close price above it (false = the volume chart alone) */
 const showPrice = ref(true)
 /**
@@ -72,6 +79,7 @@ function readSaved(): {
   perRow?: unknown
   hidden?: unknown
   fairValue?: unknown
+  priceStyle?: unknown
 } {
   try {
     const v = JSON.parse(localStorage.getItem(storageKey.value) ?? '{}')
@@ -88,13 +96,14 @@ function save() {
         perRow: perRow.value,
         hidden: hiddenIds.value,
         fairValue: showFairValue.value,
+        priceStyle: priceStyle.value,
       }),
     )
   } catch {
     // storage blocked or full: the layout just isn't remembered
   }
 }
-watch([perRow, hiddenIds, showFairValue], save, { deep: true })
+watch([perRow, hiddenIds, showFairValue, priceStyle], save, { deep: true })
 
 /* ---------- The product's spreads: one chart each, newest contract month first ---------- */
 
@@ -425,6 +434,7 @@ watch(
     rollsOpen.value = false
     displayOpen.value = false
     showFairValue.value = readSaved().fairValue !== false
+    priceStyle.value = readSaved().priceStyle === 'candles' ? 'candles' : 'line'
     showPrice.value = true
     volume.value = 'off'
     daySel.value = { from: lastDay.value, to: 0 }
@@ -601,6 +611,20 @@ onUnmounted(() => spreadsCtl?.abort())
             role="group"
             aria-label="Display"
           >
+            <div class="segmented" role="group" aria-label="Price style">
+              <button
+                v-for="o in PRICE_STYLES"
+                :key="o.value"
+                type="button"
+                :class="{ active: priceStyle === o.value }"
+                :aria-pressed="priceStyle === o.value"
+                :disabled="!priceOn"
+                :title="priceOn ? o.title : 'Turn Price on to choose how it is drawn'"
+                @click="priceStyle = o.value"
+              >
+                {{ o.label }}
+              </button>
+            </div>
             <button
               type="button"
               class="chip"
@@ -662,6 +686,7 @@ onUnmounted(() => spreadsCtl?.abort())
           :hover-key="hoverKey"
           :show-fair-value="showFairValue"
           :show-price="showPrice"
+          :price-style="priceStyle"
           :volume="volume"
           @hover-key="hoverKey = $event"
           @day-count="dayCounts.set(s.id, $event)"
@@ -871,6 +896,44 @@ select:focus-visible {
   flex-direction: column;
   align-items: stretch;
   padding: 0.5rem;
+}
+
+/* ---------- Line / Candles: two buttons joined, the chosen one lit ---------- */
+.segmented {
+  display: inline-flex;
+  min-height: 2.5rem;
+  padding: 2px;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border-hover);
+  border-radius: 10px;
+}
+.segmented button {
+  padding: 0 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segmented button:hover:not(:disabled):not(.active) {
+  color: var(--color-heading);
+}
+.segmented button.active {
+  color: var(--color-heading);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent-border);
+}
+.segmented button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.segmented button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 /* ---------- Toggle chips (Price, FV): one button, lit when on ---------- */

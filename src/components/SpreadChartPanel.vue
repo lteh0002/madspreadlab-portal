@@ -5,6 +5,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import LineChart, {
   type ChartView,
   type LinePoint,
+  type PriceStyle,
   type VolumeView,
 } from '@/components/LineChart.vue'
 import { fetchPriceData, type PriceBar, type ProductSpread } from '@/api/priceData'
@@ -14,7 +15,7 @@ import { MYT, tradingDayKey } from '@/utils/time'
 /** Days shown, shared by every chart on the page: all data, or T-from … T-to (from ≥ to) */
 export type DaySelection = { all: true } | { from: number; to: number }
 
-export type { VolumeView }
+export type { PriceStyle, VolumeView }
 
 /** Share of the chart's height the volume pane takes under the price (the chart doesn't grow) */
 const VOLUME_SHARE = 0.4
@@ -41,6 +42,8 @@ const props = defineProps<{
   hoverKey: string | null
   /** Draw this spread's fair value on the chart (when it has one; price only) */
   showFairValue: boolean
+  /** Line through the closes, or OHLC candles */
+  priceStyle: PriceStyle
   /** Volume pane under the close price: off, or AVol up / BVol down */
   volume: VolumeView
   /** With the volume pane on: false shows the volume chart alone, without the close price */
@@ -71,10 +74,19 @@ const chartRef = useTemplateRef<InstanceType<typeof LineChart>>('chart')
 const bars = ref<PriceBar[]>([])
 const volumeOn = computed(() => props.volume !== 'off')
 const priceShown = computed(() => !volumeOn.value || props.showPrice)
-/** Close price, with AVol / BVol for the volume pane (files uploaded without them have none) */
+/** Close price (with open/high/low for candles), and AVol / BVol for the volume pane (files uploaded without them have none) */
 const points = computed<LinePoint[]>(() =>
-  bars.value.map((b) => ({ date: b.timestamp, value: b.close, aVol: b.aVol, bVol: b.bVol })),
+  bars.value.map((b) => ({
+    date: b.timestamp,
+    value: b.close,
+    open: b.open,
+    high: b.high,
+    low: b.low,
+    aVol: b.aVol,
+    bVol: b.bVol,
+  })),
 )
+const candles = computed(() => props.priceStyle === 'candles')
 const truncated = ref(false)
 const view = ref<ChartView | null>(null)
 
@@ -228,7 +240,13 @@ const period = computed(() => {
 
     <!-- Series key, then (after a divider) the days and bars on screen -->
     <p class="period">
-      <span v-if="priceShown" class="key"
+      <span v-if="priceShown && candles" class="key"
+        ><span class="swatch candle" aria-hidden="true" /><span
+          class="swatch candle down"
+          aria-hidden="true"
+        />OHLC</span
+      >
+      <span v-else-if="priceShown" class="key"
         ><span class="swatch line" aria-hidden="true" />Close</span
       >
       <template v-if="volumeOn">
@@ -246,6 +264,7 @@ const period = computed(() => {
       :height="height"
       :initial-count="initialCount"
       value-label="Close"
+      :price-style="priceStyle"
       :volume="volume"
       :volume-share="VOLUME_SHARE"
       :show-line="priceShown"
@@ -255,7 +274,7 @@ const period = computed(() => {
       :max-labelled-day="lastDay"
       :day-start-hour="DAY_START_HOUR"
       :display-zone="ZONE"
-      :aria-label="`${product} ${spreadLabel} ${[priceShown && 'closing price', volumeOn && 'ask and bid volume'].filter(Boolean).join(' with ')}, ${period}`"
+      :aria-label="`${product} ${spreadLabel} ${[priceShown && (candles ? 'price candles' : 'closing price'), volumeOn && 'ask and bid volume'].filter(Boolean).join(' with ')}, ${period}`"
       :loading="loading"
       :error="error"
       :error-hint="errorHint"
@@ -384,6 +403,17 @@ select:focus-visible {
 .swatch.line {
   width: 14px;
   height: 3px;
+}
+.swatch.candle {
+  width: 5px;
+  height: 11px;
+  border-radius: 1px;
+  background: var(--color-candle-up);
+}
+.swatch.candle.down {
+  margin-left: -0.25rem;
+  height: 8px;
+  background: var(--color-candle-down);
 }
 .swatch.b {
   background: var(--color-series-2);

@@ -5,11 +5,19 @@ import { UTC, tradingDayKey, type DisplayZone } from '@/utils/time'
 export interface LinePoint {
   /** Daily: YYYY-MM-DD. Intraday: a full ISO timestamp (UTC), e.g. 2026-09-28T02:15:00.000Z */
   date: string
+  /** The close (or the only value); the line runs through it */
   value: number
+  /** The bar's open, high and low, for `priceStyle: 'candles'`; a bar without them is drawn flat at `value` */
+  open?: number
+  high?: number
+  low?: number
   /** Ask / bid volume of this bar, drawn in the volume pane (see the `volume` prop) */
   aVol?: number
   bVol?: number
 }
+
+/** How the price is drawn: a line through each close, or a candle per bar (open/high/low/close) */
+export type PriceStyle = 'line' | 'candles'
 
 /** The volume pane under the line: off, or `sides` = AVol bars up and BVol bars down from a shared zero line */
 export type VolumeView = 'off' | 'sides'
@@ -41,6 +49,8 @@ const props = withDefaults(
     initialCount?: number
     /** Name of the value in the tooltip, e.g. "Close" */
     valueLabel?: string
+    /** Line through the closes, or OHLC candles */
+    priceStyle?: PriceStyle
     /** Volume pane under the line, sharing its time axis, pan/zoom and crosshair */
     volume?: VolumeView
     /**
@@ -99,6 +109,7 @@ const props = withDefaults(
   {
     initialCount: 65,
     valueLabel: 'Value',
+    priceStyle: 'line',
     volume: 'off',
     volumeShare: 0.4,
     showLine: true,
@@ -251,6 +262,19 @@ const days = computed(() => {
   return { t, dayStart }
 })
 const isNum = (v: number | undefined): v is number => typeof v === 'number' && Number.isFinite(v)
+
+const candles = computed(() => props.priceStyle === 'candles')
+/** A point's open/high/low/close; missing sides fall back to the close (a flat bar) */
+function ohlc(p: LinePoint) {
+  const c = p.value
+  const o = isNum(p.open) ? p.open : c
+  return {
+    o,
+    h: Math.max(isNum(p.high) ? p.high : c, o, c),
+    l: Math.min(isNum(p.low) ? p.low : c, o, c),
+    c,
+  }
+}
 
 /**
  * Per point: AVol + BVol summed from the first bar of its trading day up to and including it
@@ -432,8 +456,10 @@ const chart = computed(() => {
     ;({ min, max } = yRange.value)
   } else {
     for (let i = i0; i <= i1; i++) {
-      min = Math.min(min, pts[i]!.value)
-      max = Math.max(max, pts[i]!.value)
+      // candles fit their wicks; the line only its closes
+      const { h, l } = candles.value ? ohlc(pts[i]!) : { h: pts[i]!.value, l: pts[i]!.value }
+      min = Math.min(min, l)
+      max = Math.max(max, h)
     }
     // keep the reference line in view too
     if (refLevel.value !== null) {
@@ -525,6 +551,7 @@ const chart = computed(() => {
   for (let i = i0; i <= i1; i++)
     line += `${i > i0 ? 'L' : 'M'}${x(i).toFixed(1)},${y(pts[i]!.value).toFixed(1)} `
   const area = `${line}L${x(i1).toFixed(1)},${lineH.toFixed(1)} L${x(i0).toFixed(1)},${lineH.toFixed(1)} Z`
+  const candlePaths = candles.value ? candleShapes(i0, i1, x, y, (W / width) * BAR_FILL) : null
 
   const pane = volumeOn.value ? volumePane(i0, i1, x, (W / width) * BAR_FILL, paneTop, pct) : null
 
@@ -540,6 +567,7 @@ const chart = computed(() => {
     axisSeps,
     line,
     area,
+    candles: candlePaths,
     pane,
     lineH,
     yTicks,
@@ -565,6 +593,43 @@ const chart = computed(() => {
     }),
   }
 })
+
+/**
+ * Candles for points i0…i1, in SVG units: up (close ≥ open) and down, each a path of wicks
+ * (high to low) and a path of bodies (open to close). A body never gets thinner than about a
+ * pixel, so a bar that opened and closed at the same price still shows as a tick.
+ */
+function candleShapes(
+  i0: number,
+  i1: number,
+  x: (i: number) => number,
+  y: (v: number) => number,
+  bodyW: number,
+) {
+  const minBody = H / Math.max(plotHeight.value || props.height, 1)
+  const out = { upWick: '', upBody: '', downWick: '', downBody: '' }
+  for (let i = i0; i <= i1; i++) {
+    const { o, h, l, c } = ohlc(props.points[i]!)
+    const up = c >= o
+    const cx = x(i)
+    const wick = `M${cx.toFixed(1)},${y(h).toFixed(1)} V${y(l).toFixed(1)} `
+    let top = y(Math.max(o, c))
+    let len = y(Math.min(o, c)) - top
+    if (len < minBody) {
+      top -= (minBody - len) / 2
+      len = minBody
+    }
+    const body = `M${(cx - bodyW / 2).toFixed(2)},${top.toFixed(2)} h${bodyW.toFixed(2)} v${len.toFixed(2)} h${(-bodyW).toFixed(2)} Z `
+    if (up) {
+      out.upWick += wick
+      out.upBody += body
+    } else {
+      out.downWick += wick
+      out.downBody += body
+    }
+  }
+  return out
+}
 
 /**
  * Bars of the volume pane for points i0…i1, in SVG units: `up` paths rise from the zero line,
@@ -659,6 +724,18 @@ const tip = computed(() => {
     date: props.relativeDays ? tLabel(i) : when,
     when: props.relativeDays ? when : '',
     value: valueFmt.format(p.value),
+    // Candles: the bar's open, high, low and close
+    ohlc: candles.value
+      ? (() => {
+          const { o, h, l, c } = ohlc(p)
+          return [
+            { k: 'Open', v: valueFmt.format(o) },
+            { k: 'High', v: valueFmt.format(h) },
+            { k: 'Low', v: valueFmt.format(l) },
+            { k: 'Close', v: valueFmt.format(c) },
+          ]
+        })()
+      : null,
     // Over the line: volume traded so far that day, from its first bar to this one (needs AVol / BVol)
     dayVol: (() => {
       const total = dayVolume.value[i]
@@ -945,8 +1022,16 @@ function onKeydown(e: KeyboardEvent) {
             <template v-if="!lineHidden">
               <path class="grid" :d="chart.grid" />
               <path v-if="chart.daySeparators" class="day-sep" :d="chart.daySeparators" />
-              <path :d="chart.area" :fill="`url(#${gradId})`" />
-              <path class="line" :d="chart.line" />
+              <template v-if="chart.candles">
+                <path class="wick up" :d="chart.candles.upWick" />
+                <path class="wick down" :d="chart.candles.downWick" />
+                <path class="body up" :d="chart.candles.upBody" />
+                <path class="body down" :d="chart.candles.downBody" />
+              </template>
+              <template v-else>
+                <path :d="chart.area" :fill="`url(#${gradId})`" />
+                <path class="line" :d="chart.line" />
+              </template>
               <path v-if="chart.ref" class="ref-line" :d="chart.ref.d" />
             </template>
             <g v-if="chart.pane">
@@ -978,7 +1063,7 @@ function onKeydown(e: KeyboardEvent) {
             <template v-if="tip">
               <div class="crosshair" :style="{ left: tip.left }" />
               <div
-                v-if="tip.inside && !tip.inPane"
+                v-if="tip.inside && !tip.inPane && !tip.ohlc"
                 class="dot"
                 :style="{ left: tip.left, top: tip.top }"
               />
@@ -989,7 +1074,13 @@ function onKeydown(e: KeyboardEvent) {
               >
                 <span class="tip-date">{{ tip.date }}</span>
                 <span v-if="tip.when" class="tip-when">{{ tip.when }}</span>
-                <span v-if="!tip.inPane" class="tip-row">
+                <template v-if="!tip.inPane && tip.ohlc">
+                  <span v-for="r in tip.ohlc" :key="r.k" class="tip-row">
+                    <span>{{ r.k }}</span
+                    ><strong>{{ r.v }}</strong>
+                  </span>
+                </template>
+                <span v-else-if="!tip.inPane" class="tip-row">
                   <span>{{ valueLabel }}</span
                   ><strong>{{ tip.value }}</strong>
                 </span>
@@ -1152,6 +1243,25 @@ function onKeydown(e: KeyboardEvent) {
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
+}
+
+/* Candles: green up, red down; wicks a hairline at any zoom */
+.wick {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.wick.up {
+  stroke: var(--color-candle-up);
+}
+.wick.down {
+  stroke: var(--color-candle-down);
+}
+.body.up {
+  fill: var(--color-candle-up);
+}
+.body.down {
+  fill: var(--color-candle-down);
 }
 
 /* Volume pane: AVol in the line's accent, BVol in the second-series colour */
