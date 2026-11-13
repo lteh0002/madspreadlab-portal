@@ -207,6 +207,39 @@ const view = ref<{ start: number; end: number } | null>(null)
  */
 const yRange = ref<{ min: number; max: number } | null>(null)
 
+/** Below this many prices on screen, auto scale shows them all (too few to call any stray) */
+const ROBUST_MIN_VALUES = 20
+/** Share of prices at each end left out when finding where most of them trade */
+const ROBUST_TAIL = 0.02
+/** How far past that core range (in multiples of its height) a price may be and still be fitted */
+const ROBUST_REACH = 1
+
+/**
+ * The range auto scale fits: every price except strays far from where most of them trade (e.g. a
+ * bad tick). The core is the middle 96% of prices; anything more than one core-height beyond it
+ * is left off the scale. `outliers` counts them; `all` is the full range including them.
+ */
+function robustRange(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b)
+  const all = { min: sorted[0]!, max: sorted[sorted.length - 1]! }
+  if (sorted.length < ROBUST_MIN_VALUES) return { ...all, all, outliers: 0 }
+  const last = sorted.length - 1
+  const lo = sorted[Math.floor(ROBUST_TAIL * last)]!
+  const hi = sorted[Math.ceil((1 - ROBUST_TAIL) * last)]!
+  const reach = (hi - lo) * ROBUST_REACH
+  let min = Infinity
+  let max = -Infinity
+  let outliers = 0
+  for (const v of sorted) {
+    if (v < lo - reach || v > hi + reach) outliers++
+    else {
+      min = Math.min(min, v)
+      max = Math.max(max, v)
+    }
+  }
+  return { min, max, all, outliers }
+}
+
 const valueFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 const DAY_MS = 86_400_000
 /**
@@ -449,27 +482,29 @@ const chart = computed(() => {
   const i0 = clamp(Math.floor(v.start), 0, n - 1)
   const i1 = clamp(Math.ceil(v.end), 0, n - 1)
 
-  // y fits the points on screen (TradingView-style auto scale), unless the user has set a range
-  let min = Infinity
-  let max = -Infinity
-  if (yRange.value) {
-    ;({ min, max } = yRange.value)
-  } else {
-    for (let i = i0; i <= i1; i++) {
-      // candles fit their wicks; the line only its closes
-      const { h, l } = candles.value ? ohlc(pts[i]!) : { h: pts[i]!.value, l: pts[i]!.value }
-      min = Math.min(min, l)
-      max = Math.max(max, h)
-    }
+  // y fits the points on screen (TradingView-style auto scale), unless the user has set a range.
+  // Auto scale fits where most prices trade: a stray far-off price runs off the plot instead of
+  // squashing everything else (the "Show all" button or dragging the price axis brings it in).
+  const values: number[] = []
+  for (let i = i0; i <= i1; i++) {
+    // candles fit their wicks; the line only its closes
+    if (candles.value) {
+      const { h, l } = ohlc(pts[i]!)
+      values.push(h, l)
+    } else values.push(pts[i]!.value)
+  }
+  const fit = robustRange(values)
+  const withPad = (r: { min: number; max: number }) => {
+    let { min: lo, max: hi } = r
     // keep the reference line in view too
     if (refLevel.value !== null) {
-      min = Math.min(min, refLevel.value)
-      max = Math.max(max, refLevel.value)
+      lo = Math.min(lo, refLevel.value)
+      hi = Math.max(hi, refLevel.value)
     }
-    const pad = (max - min || Math.abs(max) || 1) * 0.08
-    min -= pad
-    max += pad
+    const pad = (hi - lo || Math.abs(hi) || 1) * 0.08
+    return { min: lo - pad, max: hi + pad }
   }
+  const { min, max } = yRange.value ?? withPad(fit)
   // The line plot fills the top band; the volume pane (when on) sits below it
   const { lineH, paneTop } = bands.value
   const y = (val: number) => (1 - (val - min) / (max - min)) * lineH
@@ -560,6 +595,9 @@ const chart = computed(() => {
     n,
     yMin: min,
     yMax: max,
+    // Auto scale left stray prices off: how many, and the range that shows them all
+    offScale: yRange.value ? 0 : fit.outliers,
+    fullRange: withPad(fit.all),
     grid,
     daySeparators,
     timeTicks,
@@ -1130,7 +1168,16 @@ function onKeydown(e: KeyboardEvent) {
           </template>
 
           <button
-            v-if="yRange && !locked && !lineHidden"
+            v-if="chart.offScale && !lineHidden"
+            type="button"
+            class="auto-scale"
+            :title="`${chart.offScale} price${chart.offScale > 1 ? 's' : ''} far from the rest ${chart.offScale > 1 ? 'are' : 'is'} off the scale. Show ${chart.offScale > 1 ? 'them' : 'it'} too`"
+            @click="yRange = chart.fullRange"
+          >
+            Show all prices
+          </button>
+          <button
+            v-else-if="yRange && !lineHidden"
             type="button"
             class="auto-scale"
             title="Fit the price axis to the data on screen"
