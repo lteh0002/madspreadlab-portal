@@ -1,4 +1,4 @@
-import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
+import { API_BASE_URL, apiFetch, NETWORK_ERROR, errorMessage } from './client'
 
 /** Which part of the Spreads page a product belongs to */
 export type ProductType = 'indices' | 'commodities'
@@ -37,7 +37,7 @@ export async function createProduct(
 ): Promise<NewProduct> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/create-product`, {
+    res = await apiFetch(`${API_BASE_URL}/api/create-product`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // Exactly these fields, whatever else the object carries
@@ -84,7 +84,7 @@ export async function uploadProductData(file: File, signal?: AbortSignal): Promi
   let res: Response
   try {
     // No Content-Type header: the browser sets multipart/form-data with its boundary
-    res = await fetch(`${API_BASE_URL}/api/upload-data`, { method: 'POST', body: form, signal })
+    res = await apiFetch(`${API_BASE_URL}/api/upload-data`, { method: 'POST', body: form, signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     throw new Error(NETWORK_ERROR)
@@ -132,7 +132,7 @@ export async function fetchManagedProducts(
   const qs = productType ? `?productType=${encodeURIComponent(productType)}` : ''
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/products${qs}`, { signal })
+    res = await apiFetch(`${API_BASE_URL}/api/products${qs}`, { signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     throw new Error(NETWORK_ERROR)
@@ -165,7 +165,7 @@ export interface ProductExpiryRule {
 export async function fetchExpiryRules(signal?: AbortSignal): Promise<ProductExpiryRule[]> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/expiry-rules`, { signal })
+    res = await apiFetch(`${API_BASE_URL}/api/expiry-rules`, { signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     throw new Error(NETWORK_ERROR)
@@ -186,7 +186,7 @@ export async function setSpreadFairValue(
 ): Promise<number | null> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/spreads/${encodeURIComponent(spreadId)}/fair-value`, {
+    res = await apiFetch(`${API_BASE_URL}/api/spreads/${encodeURIComponent(spreadId)}/fair-value`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fairValue }),
@@ -208,7 +208,7 @@ export async function setSpreadFairValue(
 export async function deleteSpread(spreadId: string, signal?: AbortSignal): Promise<number> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/spreads/${encodeURIComponent(spreadId)}`, {
+    res = await apiFetch(`${API_BASE_URL}/api/spreads/${encodeURIComponent(spreadId)}`, {
       method: 'DELETE',
       signal,
     })

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getSession } from '@/api/session'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -6,6 +7,14 @@ const router = createRouter({
     {
       path: '/',
       redirect: '/spreads',
+    },
+    {
+      // Full-screen page: rendered without the sidebar (see App.vue). The only page open to
+      // everyone; the rest need a login (see the guard below).
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { bare: true, public: true },
     },
     {
       path: '/spreads',
@@ -59,6 +68,14 @@ const router = createRouter({
       component: () => import('../views/ManageProductsView.vue'),
     },
   ],
+})
+
+// Not signed in → the login page, coming back here afterwards. Signed in → skip the login page.
+// This only hides pages; the API itself refuses data to anyone without a valid session.
+router.beforeEach((to) => {
+  const signedIn = !!getSession()
+  if (!to.meta.public && !signedIn) return { name: 'login', query: { redirect: to.fullPath } }
+  if (to.name === 'login' && signedIn) return '/spreads'
 })
 
 export default router

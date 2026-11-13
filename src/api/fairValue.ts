@@ -1,4 +1,4 @@
-import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
+import { API_BASE_URL, apiFetch, NETWORK_ERROR, errorMessage } from './client'
 import type { ProductInfo } from './priceData'
 
 export interface FairValueSpread {
@@ -23,7 +23,7 @@ export interface ProductFairValues {
 export async function fetchFairValues(signal?: AbortSignal): Promise<ProductFairValues[]> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/fair-values`, { signal })
+    res = await apiFetch(`${API_BASE_URL}/api/fair-values`, { signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     // fetch() only rejects on network failure (server down, DNS, CORS, offline)

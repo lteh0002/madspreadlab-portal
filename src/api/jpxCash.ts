@@ -1,4 +1,4 @@
-import { API_BASE_URL, NETWORK_ERROR } from './client'
+import { API_BASE_URL, apiFetch, NETWORK_ERROR } from './client'
 
 export interface JpxCashRecord {
   _id: string
@@ -45,7 +45,7 @@ export async function fetchJpxCash(
 
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/api/jpx-cash${qs ? `?${qs}` : ''}`, { signal })
+    res = await apiFetch(`${API_BASE_URL}/api/jpx-cash${qs ? `?${qs}` : ''}`, { signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     // fetch() only rejects on network failure (server down, DNS, CORS, offline)

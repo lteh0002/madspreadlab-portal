@@ -1,4 +1,4 @@
-import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
+import { API_BASE_URL, apiFetch, NETWORK_ERROR, errorMessage } from './client'
 
 export interface SpreadInterval {
   /** Bar length in minutes, e.g. 15 */
@@ -44,7 +44,7 @@ export interface PriceBar {
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { signal })
+    res = await apiFetch(`${API_BASE_URL}${path}`, { signal })
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     // fetch() only rejects on network failure (server down, DNS, CORS, offline)

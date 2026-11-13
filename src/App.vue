@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
+import { logout } from '@/api/auth'
 import { useTheme } from '@/composables/useTheme'
 import logoUrl from '@/assets/logo.png'
 
@@ -20,14 +21,21 @@ const NAV: NavItem[] = [
 ]
 
 const route = useRoute()
+const router = useRouter()
 const { theme, toggle } = useTheme()
+
+function signOut() {
+  logout()
+  void router.replace({ name: 'login' })
+}
 
 const isActive = (item: NavItem) => route.path.startsWith(item.to)
 const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' : 'dark'} mode`)
 </script>
 
 <template>
-  <div class="shell">
+  <RouterView v-if="route.meta.bare" />
+  <div v-else class="shell">
     <aside class="sidebar">
       <div class="brand">
         <img class="logo" :src="logoUrl" alt="" width="40" height="40" />
@@ -63,6 +71,9 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
       <div class="topbar">
         <button type="button" class="icon-btn" :aria-label="themeLabel" :title="themeLabel" @click="toggle">
           <AppIcon :name="theme === 'dark' ? 'moon' : 'sun'" :size="20" />
+        </button>
+        <button type="button" class="icon-btn" aria-label="Sign out" title="Sign out" @click="signOut">
+          <AppIcon name="log-out" :size="20" />
         </button>
       </div>
       <RouterView />
@@ -272,8 +283,8 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
     flex-direction: row;
     align-items: center;
     gap: 0.5rem;
-    /* right: clear the fixed theme toggle (its 1rem offset + 42px width) plus a gap */
-    padding: 0.6rem calc(1rem + 42px + 0.5rem) 0.6rem 1rem;
+    /* right: clear the fixed top-bar buttons (1rem offset + two 42px buttons + their gap) plus a gap */
+    padding: 0.6rem calc(1rem + 2 * 42px + 0.25rem + 0.5rem) 0.6rem 1rem;
     border-right: 0;
     border-bottom: 1px solid var(--color-border);
     /* translucent so page artwork shows through as it scrolls under */
@@ -308,6 +319,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
     top: 0.65rem;
     right: 1rem;
     z-index: 6;
+    gap: 0.25rem;
   }
 }
 </style>

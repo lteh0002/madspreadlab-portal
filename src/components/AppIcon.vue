@@ -42,6 +42,8 @@ const ICONS = {
   'arrow-left': '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  'log-out':
+    '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
   'collapse-all': '<path d="m7 20 5-5 5 5"/><path d="m7 4 5 5 5-5"/>',
   'expand-all': '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
 } as const
