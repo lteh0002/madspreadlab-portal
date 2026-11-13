@@ -847,7 +847,10 @@ h3 {
   gap: 1rem;
   aspect-ratio: 1;
   min-width: 0;
-  padding: 1.15rem;
+  /* stay square: without this, text that doesn't fit makes the card taller than its neighbours */
+  overflow: hidden;
+  /* same on every side; the text sits on the bottom edge (no empty line reserved under it) */
+  padding: 1.25rem;
   border: 1px solid var(--color-border-hover);
   border-radius: var(--radius-lg);
   /* one flat surface: no gradient, no shadow */
@@ -910,6 +913,9 @@ h3 {
 }
 /* Quiet until hovered: the whole tile is the link */
 .go {
+  /* the icon has ~4px of empty space inside its box: pull it out so the arrow itself sits on the
+     padding line, like the tile on the left */
+  margin: -4px -4px 0 0;
   color: var(--color-text-muted);
   transition:
     color 0.2s,
@@ -927,21 +933,22 @@ h3 {
   min-width: 0;
 }
 .card-title {
+  /* one line, so every card in a row is the same height; long names end in "…" */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.25;
   color: var(--color-heading);
 }
 .card-desc {
-  display: -webkit-box;
+  /* one line like the title, so every card has the same layout; keep descriptions short */
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 0.85rem;
   line-height: 1.35;
-  /* always two lines tall, so titles line up across a row whether the text wraps or not */
-  min-height: 2.7em;
   color: var(--color-text-muted);
 }
 
@@ -1042,7 +1049,7 @@ h3 {
     gap: 0.75rem;
   }
   .card {
-    padding: 0.95rem;
+    padding: 1rem;
   }
   .tile {
     width: 44px;

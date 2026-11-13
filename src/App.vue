@@ -67,16 +67,6 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
           <span class="nav-label">{{ item.label }}</span>
         </RouterLink>
       </nav>
-
-      <RouterLink to="/spreads" class="promo" aria-label="Browse spreads">
-        <svg class="promo-curve" viewBox="0 0 200 120" preserveAspectRatio="none" aria-hidden="true">
-          <path class="area" d="M0 120 L0 112 C 50 108, 80 100, 110 85 S 170 30, 200 10 L200 120 Z" />
-          <path class="line" d="M0 112 C 50 108, 80 100, 110 85 S 170 30, 200 10" />
-          <path class="line faint" d="M30 120 C 80 104, 120 90, 150 60 S 190 20, 200 25" />
-        </svg>
-        <p>Trade Smarter.<br />Analyse Deeper.</p>
-        <span class="promo-go" aria-hidden="true"><AppIcon name="arrow" :size="18" :stroke-width="2.25" /></span>
-      </RouterLink>
     </aside>
 
     <div class="content">
@@ -184,65 +174,6 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
   color: var(--color-on-accent);
 }
 
-.promo {
-  position: relative;
-  display: block;
-  margin-top: auto;
-  overflow: hidden;
-  min-height: 150px;
-  padding: 1.5rem 1.4rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-accent-border);
-  background: var(--card-background);
-  color: inherit;
-}
-.promo:hover {
-  background: var(--card-background);
-  border-color: var(--color-accent);
-}
-.promo p {
-  position: relative;
-  z-index: 1;
-  color: var(--color-heading);
-  font-size: 1rem;
-  line-height: 1.7;
-}
-.promo-curve {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.promo-curve .area {
-  fill: var(--color-accent-soft);
-}
-.promo-curve .line {
-  fill: none;
-  stroke: var(--color-accent);
-  stroke-width: 1.5;
-  opacity: 0.6;
-  vector-effect: non-scaling-stroke;
-}
-.promo-curve .faint {
-  opacity: 0.25;
-}
-.promo-go {
-  position: absolute;
-  right: 1rem;
-  bottom: 1rem;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: var(--color-accent-solid);
-  color: var(--color-on-accent);
-  transition: transform 0.2s;
-}
-.promo:hover .promo-go {
-  transform: translateX(2px);
-}
-
 /* ---------- Content ---------- */
 .content {
   position: relative;
@@ -310,8 +241,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
     border: 0;
   }
   .brand-text,
-  .nav-label,
-  .promo {
+  .nav-label {
     display: none;
   }
   .nav {
