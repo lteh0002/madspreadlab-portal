@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
-import { logout } from '@/api/auth'
+import { logout, refreshUser } from '@/api/auth'
+import { getSession, isAdmin } from '@/api/session'
 import { useTheme } from '@/composables/useTheme'
 import logoUrl from '@/assets/logo.png'
 
@@ -11,14 +12,18 @@ interface NavItem {
   icon: IconName
   /** Path prefix this item owns */
   to: string
+  adminOnly?: boolean
 }
 
 const NAV: NavItem[] = [
   { label: 'Spreads', icon: 'grid', to: '/spreads' },
   { label: 'Calendar', icon: 'calendar-solid', to: '/calendar' },
   { label: 'Research', icon: 'flask-solid', to: '/research' },
-  { label: 'Admin', icon: 'shield-solid', to: '/admin' },
+  { label: 'Admin', icon: 'shield-solid', to: '/admin', adminOnly: true },
 ]
+
+/** Admin only shows for users with userType "admin" */
+const nav = computed(() => NAV.filter((item) => !item.adminOnly || isAdmin.value))
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +33,13 @@ function signOut() {
   logout()
   void router.replace({ name: 'login' })
 }
+
+// Pick up changes to the user (e.g. userType) made in the database since they signed in
+onMounted(() => void refreshUser())
+// Admin access removed while on an admin page: leave it
+watch(isAdmin, (admin) => {
+  if (!admin && route.meta.admin && getSession()) void router.replace('/spreads')
+})
 
 const isActive = (item: NavItem) => route.path.startsWith(item.to)
 const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' : 'dark'} mode`)
@@ -44,7 +56,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 
       <nav class="nav" aria-label="Main">
         <RouterLink
-          v-for="item in NAV"
+          v-for="item in nav"
           :key="item.label"
           :to="item.to"
           class="nav-item"

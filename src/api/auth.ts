@@ -1,5 +1,23 @@
-import { API_BASE_URL, NETWORK_ERROR, errorMessage } from './client'
-import { clearSession, getSession, type Session } from './session'
+import { API_BASE_URL, NETWORK_ERROR, apiFetch, errorMessage } from './client'
+import { clearSession, getSession, saveSession, type Session } from './session'
+
+/**
+ * GET /api/me: refreshes the signed-in user's details (e.g. a userType changed in the database).
+ * A 401 signs out via apiFetch; other failures keep what we have.
+ */
+export async function refreshUser() {
+  const s = getSession()
+  if (!s) return
+  try {
+    const res = await apiFetch(`${API_BASE_URL}/api/me`)
+    if (!res.ok) return
+    const { user } = (await res.json()) as { user: Session['user'] }
+    // Only if still the same session (not signed out or switched meanwhile)
+    if (getSession()?.token === s.token) saveSession({ ...s, user })
+  } catch {
+    // offline: keep the stored details
+  }
+}
 
 /**
  * POST /api/login

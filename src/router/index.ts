@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { getSession } from '@/api/session'
+import { refreshUser } from '@/api/auth'
+import { getSession, isAdmin } from '@/api/session'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -56,26 +57,36 @@ const router = createRouter({
       component: () => import('../views/ResearchView.vue'),
     },
     {
-      // NOTE: not protected yet. Admin actions must be checked server-side once they exist.
+      // Admins only (userType "admin"); the API also refuses admin actions to anyone else
       path: '/admin',
       name: 'admin',
       component: () => import('../views/AdminView.vue'),
+      meta: { admin: true },
     },
     {
-      // Every product and its spreads; set fair values. Not protected yet, like /admin.
+      // Every product and its spreads; set fair values. Admins only, like /admin.
       path: '/admin/products',
       name: 'manage-products',
       component: () => import('../views/ManageProductsView.vue'),
+      meta: { admin: true },
     },
   ],
 })
 
 // Not signed in → the login page, coming back here afterwards. Signed in → skip the login page.
-// This only hides pages; the API itself refuses data to anyone without a valid session.
-router.beforeEach((to) => {
+// Admin pages → Spreads for non-admins.
+// This only hides pages; the API itself refuses data without a valid session, and admin actions
+// to non-admins.
+router.beforeEach(async (to) => {
   const signedIn = !!getSession()
   if (!to.meta.public && !signedIn) return { name: 'login', query: { redirect: to.fullPath } }
   if (to.name === 'login' && signedIn) return '/spreads'
+  if (to.meta.admin && !isAdmin.value) {
+    // The stored details may be out of date (e.g. just made admin): ask the server before refusing
+    await refreshUser()
+    if (!getSession()) return { name: 'login', query: { redirect: to.fullPath } }
+    if (!isAdmin.value) return '/spreads'
+  }
 })
 
 export default router
