@@ -58,8 +58,12 @@ export interface SpreadSection {
   groups: SpreadGroup[]
 }
 
-/** A commodity's category: the same three views for each product. Not built yet, so all "Soon" */
-function commodityGroup(product: string): SpreadGroup {
+/**
+ * A product's category: the same three views for each product. Not built yet, so all "Soon".
+ * `dbProduct` is the product's name in the database when it differs from the name shown
+ * (e.g. FTW is stored as TWN).
+ */
+function commodityGroup(product: string, dbProduct = product): SpreadGroup {
   const slug = product.toLowerCase()
   return {
     title: product,
@@ -86,7 +90,7 @@ function commodityGroup(product: string): SpreadGroup {
         pageTitle: `${product} Spreads`,
         // Same price chart page as the index rolls; needs the product and its data in the database
         routeName: 'product-chart',
-        routeParams: { product },
+        routeParams: { product: dbProduct },
         description: 'Calendar spreads between contract months',
         badge: product,
         tags: ['Spreads'],
@@ -138,15 +142,29 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
           },
           {
             name: 'roll-twn',
-            label: 'TWN Roll',
-            pageTitle: 'TWN Index Roll',
+            label: 'FTW Roll',
+            pageTitle: 'FTW Index Roll',
             // Opens the price chart from the database (price_data), like MCA
             routeName: 'product-chart',
             routeParams: { product: 'TWN' },
             description: 'Taiwan index roll',
             emoji: '🇹🇼',
-            badge: 'TWN',
+            badge: 'FTW',
             tags: ['Taiwan'],
+          },
+          {
+            name: 'roll-mtw',
+            label: 'MTW Roll',
+            pageTitle: 'MTW Index Roll',
+            // Opens the price chart from the database (price_data), like the other rolls
+            routeName: 'product-chart',
+            routeParams: { product: 'MTW' },
+            description: 'MSCI Taiwan index roll',
+            emoji: '🇹🇼',
+            badge: 'MTW',
+            tags: ['Taiwan'],
+            // Remove once the MTW product and its 15-min data are uploaded
+            comingSoon: true,
           },
           {
             name: 'roll-fkli',
@@ -172,8 +190,35 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             badge: 'MCA',
             tags: ['China'],
           },
+          {
+            name: 'roll-hsi',
+            label: 'HSI Roll',
+            pageTitle: 'HSI Index Roll',
+            // Opens the price chart from the database (price_data), like the other rolls
+            routeName: 'product-chart',
+            routeParams: { product: 'HSI' },
+            description: 'Hang Seng index roll',
+            emoji: '🇭🇰',
+            badge: 'HSI',
+            tags: ['Hong Kong'],
+          },
+          {
+            name: 'roll-cn',
+            label: 'CN A50 Roll',
+            pageTitle: 'CN A50 Index Roll',
+            // Opens the price chart from the database (price_data), like the other rolls
+            routeName: 'product-chart',
+            routeParams: { product: 'CN' },
+            description: 'FTSE China A50 index roll',
+            emoji: '🇨🇳',
+            badge: 'CN',
+            tags: ['China'],
+            // Remove once the CN product and its 15-min data are uploaded
+            comingSoon: true,
+          },
         ],
       },
+      commodityGroup('FTW', 'TWN'),
       {
         title: 'JPX',
         spreads: [
