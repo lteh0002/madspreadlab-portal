@@ -218,7 +218,6 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
           },
         ],
       },
-      commodityGroup('FTW', 'TWN'),
       {
         title: 'JPX',
         spreads: [
