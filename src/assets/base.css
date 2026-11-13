@@ -31,6 +31,10 @@
   /* Candlesticks: close at or above open (up), below it (down) */
   --color-candle-up: #2fd181;
   --color-candle-down: #f2645a;
+  /* Tones in research reports (wins / losses / flat), for marks, badges and P&L figures */
+  --color-tone-positive: var(--color-candle-up);
+  --color-tone-negative: var(--color-candle-down);
+  --color-tone-neutral: #8b9690;
 
   --card-background: linear-gradient(155deg, #0f2a1e 0%, #0b1c15 55%, #09160f 100%);
   --tile-background: linear-gradient(150deg, #1f8a56 0%, #0f4f31 100%);
@@ -70,6 +74,7 @@
   --color-series-2: #2f6fd6;
   --color-candle-up: #0f9f62;
   --color-candle-down: #d4362c;
+  --color-tone-neutral: #7d8a83;
 
   --card-background: linear-gradient(155deg, #ffffff 0%, #f3faf6 100%);
   --tile-background: linear-gradient(150deg, #1fa365 0%, #0d7547 100%);

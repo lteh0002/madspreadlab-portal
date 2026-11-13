@@ -1,68 +1,93 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import ReportMetrics from '@/components/research/ReportMetrics.vue'
+import StatusPill from '@/components/research/StatusPill.vue'
 import { usePageTitle } from '@/composables/usePageTitle'
-import { RESEARCH_NOTES } from '@/data/research'
+import {
+  REPORT_LOAD_ERRORS,
+  RESEARCH_REPORTS,
+  type MetricItem,
+  type ResearchReport,
+} from '@/data/research'
+import { formatReportDate } from '@/utils/reportFormat'
 
 usePageTitle('Research')
 
-/** Newest first */
-const notes = computed(() => [...RESEARCH_NOTES].sort((a, b) => b.date.localeCompare(a.date)))
+const isDev = import.meta.env.DEV
 
-const dateFormat = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
-const formatDate = (day: string) => dateFormat.format(new Date(`${day}T00:00:00Z`))
+/** Headline numbers on a card: the first four of the report's first metrics section */
+function headline(r: ResearchReport): MetricItem[] {
+  const s = r.sections.find((x) => x.type === 'metrics')
+  return s?.type === 'metrics' ? s.items.slice(0, 4) : []
+}
+
+const cards = computed(() =>
+  RESEARCH_REPORTS.map((r) => ({
+    report: r,
+    chips: [r.meta.market, r.meta.instrument_type, ...(r.meta.tags ?? [])].filter(
+      (x): x is string => !!x,
+    ),
+    metrics: headline(r),
+  })),
+)
 </script>
 
 <template>
   <main>
     <header class="hero">
       <h1>Research</h1>
-      <p class="subtitle">Backtests and what they found.</p>
+      <p class="subtitle">Strategies, backtests and what they found.</p>
     </header>
 
-    <ul v-if="notes.length" class="notes">
-      <li v-for="n in notes" :id="n.id" :key="n.id">
-        <article class="card" :aria-labelledby="`${n.id}-title`">
-          <header class="card-head">
-            <div class="meta">
-              <time :datetime="n.date">{{ formatDate(n.date) }}</time>
-              <span v-if="n.inProgress" class="pill">In progress</span>
-            </div>
-            <h2 :id="`${n.id}-title`" class="title">{{ n.title }}</h2>
-            <ul v-if="n.products?.length || n.tags?.length" class="tags">
-              <li v-for="p in n.products" :key="`p-${p}`" class="tag product">{{ p }}</li>
-              <li v-for="t in n.tags" :key="`t-${t}`" class="tag">{{ t }}</li>
-            </ul>
-          </header>
+    <div v-if="isDev && REPORT_LOAD_ERRORS.length" class="dev-warning" role="alert">
+      <strong>Some report files couldn't be loaded (only visible in dev):</strong>
+      <ul>
+        <li v-for="e in REPORT_LOAD_ERRORS" :key="e">{{ e }}</li>
+      </ul>
+    </div>
 
-          <p class="summary">{{ n.summary }}</p>
+    <ul v-if="cards.length" class="notes">
+      <li v-for="{ report: r, chips, metrics } in cards" :key="r.meta.id">
+        <RouterLink :to="{ name: 'research-report', params: { id: r.meta.id } }" class="card-link">
+          <article class="card" :aria-labelledby="`${r.meta.id}-title`">
+            <header class="card-head">
+              <div class="meta">
+                <StatusPill v-if="r.meta.status" :status="r.meta.status" />
+                <time v-if="r.meta.as_of" :datetime="r.meta.as_of"
+                  >As of {{ formatReportDate(r.meta.as_of, 'long') }}</time
+                >
+              </div>
+              <h2 :id="`${r.meta.id}-title`" class="title">{{ r.meta.title }}</h2>
+              <ul v-if="chips.length" class="tags">
+                <li
+                  v-for="(c, i) in chips"
+                  :key="c"
+                  class="tag"
+                  :class="{ product: i === 0 && r.meta.market }"
+                >
+                  {{ c }}
+                </li>
+              </ul>
+            </header>
 
-          <dl v-if="n.metrics?.length" class="metrics">
-            <div v-for="m in n.metrics" :key="m.label" class="metric">
-              <dt>{{ m.label }}</dt>
-              <dd>{{ m.value }}</dd>
-            </div>
-          </dl>
+            <p v-if="r.meta.subtitle" class="subtitle-line">{{ r.meta.subtitle }}</p>
 
-          <section v-if="n.findings?.length" class="findings" :aria-label="`${n.title}: findings`">
-            <h3 class="findings-title">Findings</h3>
-            <ul>
-              <li v-for="(f, i) in n.findings" :key="i">{{ f }}</li>
-            </ul>
-          </section>
-        </article>
+            <ReportMetrics v-if="metrics.length" :items="metrics" :units="r.meta.units" compact />
+
+            <span class="open-hint"
+              >Read report <AppIcon name="arrow" :size="14" :stroke-width="2.25"
+            /></span>
+          </article>
+        </RouterLink>
       </li>
     </ul>
 
     <div v-else class="empty">
       <span class="empty-icon"><AppIcon name="flask" :size="28" :stroke-width="2" /></span>
       <p class="empty-title">No research yet</p>
-      <p class="empty-text">Backtest write-ups will appear here as they're added.</p>
+      <p class="empty-text">Strategy reports will appear here as they're added.</p>
     </div>
   </main>
 </template>
@@ -127,16 +152,6 @@ h1 {
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
-.pill {
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-reference) 16%, transparent);
-  color: var(--color-reference);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 .title {
   font-size: 1.3rem;
   font-weight: 600;
@@ -165,54 +180,52 @@ h1 {
   font-weight: 600;
 }
 
-.summary {
+.subtitle-line {
   font-size: 0.95rem;
   line-height: 1.55;
 }
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.75rem;
+.card-link {
+  display: block;
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
 }
-.metric {
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--color-border);
+.card-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.card {
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.card-link:hover .card {
+  border-color: var(--color-accent-border);
+  transform: translateY(-1px);
+}
+.card-link:hover .title {
+  color: var(--color-accent-strong);
+}
+.open-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-accent-strong);
+}
+.dev-warning {
+  max-width: 880px;
+  margin-bottom: 1.5rem;
+  padding: 0.8rem 1rem;
+  border: 1px dashed var(--color-reference);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-background-mute) 60%, transparent);
+  color: var(--color-reference);
+  font-size: 0.85rem;
 }
-.metric dt {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-.metric dd {
-  margin: 0.25rem 0 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-heading);
-}
-
-.findings-title {
-  margin-bottom: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-.findings ul {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+.dev-warning ul {
+  margin-top: 0.3rem;
   padding-left: 1.2rem;
-  line-height: 1.5;
-}
-.findings li::marker {
-  color: var(--color-accent);
 }
 
 .empty {

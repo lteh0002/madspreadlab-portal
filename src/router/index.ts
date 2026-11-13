@@ -57,6 +57,13 @@ const router = createRouter({
       component: () => import('../views/ResearchView.vue'),
     },
     {
+      // One report from src/data/research/reports/, by its meta.id
+      path: '/research/:id',
+      name: 'research-report',
+      component: () => import('../views/ResearchReportView.vue'),
+      props: true,
+    },
+    {
       // Admins only (userType "admin"); the API also refuses admin actions to anyone else
       path: '/admin',
       name: 'admin',

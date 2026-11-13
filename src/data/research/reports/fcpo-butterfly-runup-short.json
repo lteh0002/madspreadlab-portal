@@ -1,0 +1,1137 @@
+{
+  "schema_version": "1.0",
+  "meta": {
+    "id": "fcpo-butterfly-runup-short",
+    "title": "FCPO butterfly run-up short",
+    "subtitle": "Short the expiring 1-month butterfly after a 40-day run-up",
+    "market": "Bursa Malaysia FCPO",
+    "instrument_type": "butterfly spread",
+    "status": "forward-testing",
+    "as_of": "2026-11-12",
+    "author": null,
+    "tags": [
+      "FCPO",
+      "butterfly",
+      "calendar spread",
+      "mean reversion"
+    ],
+    "units": {
+      "pts": {
+        "label": "points",
+        "suffix": " pts"
+      },
+      "myr": {
+        "label": "MYR",
+        "prefix": "MYR "
+      }
+    }
+  },
+  "sections": [
+    {
+      "id": "rules",
+      "type": "rules",
+      "title": "Strategy rules",
+      "items": [
+        {
+          "label": "Which fly",
+          "text": "The next 1-month butterfly to expire, traded only in the month before its contract month."
+        },
+        {
+          "label": "Check day",
+          "text": "Close on the 1st trading day of that month."
+        },
+        {
+          "label": "Signal",
+          "text": "Short if that close is above the close 40 trading days earlier. Otherwise no trade."
+        },
+        {
+          "label": "Stop",
+          "text": "Resting buy-stop 30 pts above entry."
+        },
+        {
+          "label": "Exit",
+          "text": "Close on the last trading day of the month. Short only, never long."
+        }
+      ],
+      "params": {
+        "lookback_trading_days": 40,
+        "stop_pts": 30,
+        "direction": "short",
+        "point_value_myr": 25
+      }
+    },
+    {
+      "id": "kpis",
+      "type": "metrics",
+      "title": "Results, Jan21 to Nov26",
+      "items": [
+        {
+          "key": "trades",
+          "label": "Trades",
+          "value": 31,
+          "format": "integer",
+          "note": "+1 open"
+        },
+        {
+          "key": "win_rate",
+          "label": "Win rate",
+          "value": 0.61,
+          "format": "percent",
+          "note": "19 won, 11 stopped, 1 flat"
+        },
+        {
+          "key": "total",
+          "label": "Total",
+          "value": 1986,
+          "format": "signed",
+          "unit": "pts",
+          "note": "about MYR 49.7k per fly"
+        },
+        {
+          "key": "avg_win",
+          "label": "Average win",
+          "value": 121.9,
+          "format": "signed",
+          "decimals": 0,
+          "unit": "pts"
+        },
+        {
+          "key": "avg_loss",
+          "label": "Average loss",
+          "value": -30,
+          "format": "signed",
+          "unit": "pts"
+        },
+        {
+          "key": "max_dd",
+          "label": "Worst drawdown",
+          "value": -91,
+          "format": "signed",
+          "unit": "pts",
+          "tone": "negative"
+        }
+      ]
+    },
+    {
+      "id": "equity",
+      "type": "chart",
+      "title": "Running total",
+      "chart": {
+        "kind": "line",
+        "x": {
+          "label": "Trade",
+          "values": [
+            "Mar21",
+            "Apr21",
+            "May21",
+            "Jun21",
+            "Sep21",
+            "Oct21",
+            "Dec21",
+            "Jan22",
+            "Feb22",
+            "Apr22",
+            "May22",
+            "Jun22",
+            "Jul22",
+            "Feb23",
+            "Mar23",
+            "May23",
+            "Jun23",
+            "Jul23",
+            "Nov23",
+            "Feb24",
+            "Mar24",
+            "Sep24",
+            "Feb25",
+            "Mar25",
+            "May25",
+            "Dec25",
+            "Jan26",
+            "Feb26",
+            "Jul26",
+            "Aug26",
+            "Nov26"
+          ]
+        },
+        "y": {
+          "label": "Points",
+          "unit": "pts"
+        },
+        "series": [
+          {
+            "name": "30-pt stop",
+            "values": [
+              184,
+              154,
+              124,
+              314,
+              361,
+              331,
+              413,
+              532,
+              758,
+              728,
+              1328,
+              1684,
+              1654,
+              1624,
+              1631,
+              1601,
+              1786,
+              1871,
+              1922,
+              1929,
+              1899,
+              1869,
+              1839,
+              1868,
+              1838,
+              1838,
+              1872,
+              1885,
+              1889,
+              1927,
+              1986
+            ],
+            "style": "primary",
+            "point_tone": [
+              "positive",
+              "negative",
+              "negative",
+              "positive",
+              "positive",
+              "negative",
+              "positive",
+              "positive",
+              "positive",
+              "negative",
+              "positive",
+              "positive",
+              "negative",
+              "negative",
+              "positive",
+              "negative",
+              "positive",
+              "positive",
+              "positive",
+              "positive",
+              "negative",
+              "negative",
+              "negative",
+              "positive",
+              "negative",
+              "neutral",
+              "positive",
+              "positive",
+              "positive",
+              "positive",
+              "positive"
+            ]
+          },
+          {
+            "name": "No stop",
+            "values": [
+              184,
+              202,
+              218,
+              408,
+              455,
+              484,
+              566,
+              685,
+              911,
+              1080,
+              1680,
+              2036,
+              2075,
+              2123,
+              2130,
+              2011,
+              2196,
+              2281,
+              2332,
+              2339,
+              2368,
+              2381,
+              2381,
+              2410,
+              2434,
+              2434,
+              2468,
+              2481,
+              2485,
+              2523,
+              2582
+            ],
+            "style": "comparison"
+          }
+        ]
+      }
+    },
+    {
+      "id": "by_year",
+      "type": "chart",
+      "title": "Points by year",
+      "chart": {
+        "kind": "bar",
+        "x": {
+          "label": "Year",
+          "values": [
+            "2021",
+            "2022",
+            "2023",
+            "2024",
+            "2025",
+            "2026"
+          ]
+        },
+        "y": {
+          "label": "Points",
+          "unit": "pts"
+        },
+        "series": [
+          {
+            "name": "30-pt stop",
+            "values": [
+              413,
+              1241,
+              268,
+              -53,
+              -31,
+              148
+            ],
+            "tone_by_sign": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "trades",
+      "type": "table",
+      "title": "All trades",
+      "group_by": "year",
+      "default_sort": {
+        "key": "entry_date",
+        "dir": "asc"
+      },
+      "columns": [
+        {
+          "key": "name",
+          "label": "Fly",
+          "type": "string"
+        },
+        {
+          "key": "year",
+          "label": "Year",
+          "type": "string",
+          "hidden": true
+        },
+        {
+          "key": "entry_date",
+          "label": "Entry date",
+          "type": "date"
+        },
+        {
+          "key": "signal_value",
+          "label": "Run-up",
+          "type": "number",
+          "format": "signed",
+          "unit": "pts"
+        },
+        {
+          "key": "entry",
+          "label": "Entry",
+          "type": "number"
+        },
+        {
+          "key": "exit",
+          "label": "Exit",
+          "type": "number"
+        },
+        {
+          "key": "pnl",
+          "label": "P&L",
+          "type": "number",
+          "format": "signed",
+          "unit": "pts",
+          "tone_by_sign": true
+        },
+        {
+          "key": "max_drawdown",
+          "label": "Max drawdown",
+          "type": "number",
+          "unit": "pts"
+        },
+        {
+          "key": "status",
+          "label": "Result",
+          "type": "badge",
+          "options": {
+            "held": "positive",
+            "stopped": "negative",
+            "flat": "neutral",
+            "open": "info"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "name": "Mar21",
+          "year": "2021",
+          "entry_date": "2021-02-02",
+          "signal_value": 64,
+          "entry": 74,
+          "exit": -110,
+          "pnl": 184,
+          "max_drawdown": 29,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Mar21",
+              "sell 2 Apr21",
+              "buy 1 May21"
+            ],
+            "lookback_close": 10,
+            "stop": 104,
+            "exit_date": "2021-02-26",
+            "pnl_no_stop": 184,
+            "max_drawdown_no_stop": 29
+          }
+        },
+        {
+          "name": "Apr21",
+          "year": "2021",
+          "entry_date": "2021-03-01",
+          "signal_value": 26,
+          "entry": 40,
+          "exit": 70,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Apr21",
+              "sell 2 May21",
+              "buy 1 Jun21"
+            ],
+            "lookback_close": 14,
+            "stop": 70,
+            "exit_date": "2021-03-17",
+            "pnl_no_stop": 18,
+            "max_drawdown_no_stop": 30
+          }
+        },
+        {
+          "name": "May21",
+          "year": "2021",
+          "entry_date": "2021-04-01",
+          "signal_value": 28,
+          "entry": 46,
+          "exit": 76,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 May21",
+              "sell 2 Jun21",
+              "buy 1 Jul21"
+            ],
+            "lookback_close": 18,
+            "stop": 76,
+            "exit_date": "2021-04-08",
+            "pnl_no_stop": 16,
+            "max_drawdown_no_stop": 65
+          }
+        },
+        {
+          "name": "Jun21",
+          "year": "2021",
+          "entry_date": "2021-05-03",
+          "signal_value": 55,
+          "entry": 80,
+          "exit": -110,
+          "pnl": 190,
+          "max_drawdown": 8,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jun21",
+              "sell 2 Jul21",
+              "buy 1 Aug21"
+            ],
+            "lookback_close": 25,
+            "stop": 110,
+            "exit_date": "2021-05-31",
+            "pnl_no_stop": 190,
+            "max_drawdown_no_stop": 8
+          }
+        },
+        {
+          "name": "Sep21",
+          "year": "2021",
+          "entry_date": "2021-08-02",
+          "signal_value": 51,
+          "entry": 63,
+          "exit": 16,
+          "pnl": 47,
+          "max_drawdown": 15,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Sep21",
+              "sell 2 Oct21",
+              "buy 1 Nov21"
+            ],
+            "lookback_close": 12,
+            "stop": 93,
+            "exit_date": "2021-08-30",
+            "pnl_no_stop": 47,
+            "max_drawdown_no_stop": 15
+          }
+        },
+        {
+          "name": "Oct21",
+          "year": "2021",
+          "entry_date": "2021-09-01",
+          "signal_value": 10,
+          "entry": 34,
+          "exit": 64,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Oct21",
+              "sell 2 Nov21",
+              "buy 1 Dec21"
+            ],
+            "lookback_close": 24,
+            "stop": 64,
+            "exit_date": "2021-09-20",
+            "pnl_no_stop": 29,
+            "max_drawdown_no_stop": 35
+          }
+        },
+        {
+          "name": "Dec21",
+          "year": "2021",
+          "entry_date": "2021-11-01",
+          "signal_value": 61,
+          "entry": 62,
+          "exit": -20,
+          "pnl": 82,
+          "max_drawdown": 13,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Dec21",
+              "sell 2 Jan22",
+              "buy 1 Feb22"
+            ],
+            "lookback_close": 1,
+            "stop": 92,
+            "exit_date": "2021-11-30",
+            "pnl_no_stop": 82,
+            "max_drawdown_no_stop": 13
+          }
+        },
+        {
+          "name": "Jan22",
+          "year": "2022",
+          "entry_date": "2021-12-01",
+          "signal_value": 62,
+          "entry": 49,
+          "exit": -70,
+          "pnl": 119,
+          "max_drawdown": 12,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jan22",
+              "sell 2 Feb22",
+              "buy 1 Mar22"
+            ],
+            "lookback_close": -13,
+            "stop": 79,
+            "exit_date": "2021-12-31",
+            "pnl_no_stop": 119,
+            "max_drawdown_no_stop": 12
+          }
+        },
+        {
+          "name": "Feb22",
+          "year": "2022",
+          "entry_date": "2022-01-03",
+          "signal_value": 46,
+          "entry": 58,
+          "exit": -168,
+          "pnl": 226,
+          "max_drawdown": 5,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Feb22",
+              "sell 2 Mar22",
+              "buy 1 Apr22"
+            ],
+            "lookback_close": 12,
+            "stop": 88,
+            "exit_date": "2022-01-28",
+            "pnl_no_stop": 226,
+            "max_drawdown_no_stop": 5
+          }
+        },
+        {
+          "name": "Apr22",
+          "year": "2022",
+          "entry_date": "2022-03-01",
+          "signal_value": 155,
+          "entry": 189,
+          "exit": 219,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Apr22",
+              "sell 2 May22",
+              "buy 1 Jun22"
+            ],
+            "lookback_close": 34,
+            "stop": 219,
+            "exit_date": "2022-03-02",
+            "pnl_no_stop": 169,
+            "max_drawdown_no_stop": 241
+          }
+        },
+        {
+          "name": "May22",
+          "year": "2022",
+          "entry_date": "2022-04-01",
+          "signal_value": 177,
+          "entry": 192,
+          "exit": -408,
+          "pnl": 600,
+          "max_drawdown": 28,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 May22",
+              "sell 2 Jun22",
+              "buy 1 Jul22"
+            ],
+            "lookback_close": 15,
+            "stop": 222,
+            "exit_date": "2022-04-29",
+            "pnl_no_stop": 600,
+            "max_drawdown_no_stop": 28
+          }
+        },
+        {
+          "name": "Jun22",
+          "year": "2022",
+          "entry_date": "2022-05-05",
+          "signal_value": 105,
+          "entry": 136,
+          "exit": -220,
+          "pnl": 356,
+          "max_drawdown": 8,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jun22",
+              "sell 2 Jul22",
+              "buy 1 Aug22"
+            ],
+            "lookback_close": 31,
+            "stop": 166,
+            "exit_date": "2022-05-31",
+            "pnl_no_stop": 356,
+            "max_drawdown_no_stop": 8
+          }
+        },
+        {
+          "name": "Jul22",
+          "year": "2022",
+          "entry_date": "2022-06-01",
+          "signal_value": 5,
+          "entry": 60,
+          "exit": 90,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Jul22",
+              "sell 2 Aug22",
+              "buy 1 Sep22"
+            ],
+            "lookback_close": 55,
+            "stop": 90,
+            "exit_date": "2022-06-09",
+            "pnl_no_stop": 39,
+            "max_drawdown_no_stop": 100
+          }
+        },
+        {
+          "name": "Feb23",
+          "year": "2023",
+          "entry_date": "2023-01-03",
+          "signal_value": 4,
+          "entry": -25,
+          "exit": 5,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Feb23",
+              "sell 2 Mar23",
+              "buy 1 Apr23"
+            ],
+            "lookback_close": -29,
+            "stop": 5,
+            "exit_date": "2023-01-17",
+            "pnl_no_stop": 48,
+            "max_drawdown_no_stop": 39
+          }
+        },
+        {
+          "name": "Mar23",
+          "year": "2023",
+          "entry_date": "2023-02-02",
+          "signal_value": 15,
+          "entry": -4,
+          "exit": -11,
+          "pnl": 7,
+          "max_drawdown": 0,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Mar23",
+              "sell 2 Apr23",
+              "buy 1 May23"
+            ],
+            "lookback_close": -19,
+            "stop": 26,
+            "exit_date": "2023-02-28",
+            "pnl_no_stop": 7,
+            "max_drawdown_no_stop": 0
+          }
+        },
+        {
+          "name": "May23",
+          "year": "2023",
+          "entry_date": "2023-04-03",
+          "signal_value": 60,
+          "entry": 51,
+          "exit": 81,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 May23",
+              "sell 2 Jun23",
+              "buy 1 Jul23"
+            ],
+            "lookback_close": -9,
+            "stop": 81,
+            "exit_date": "2023-04-10",
+            "pnl_no_stop": -119,
+            "max_drawdown_no_stop": 268
+          }
+        },
+        {
+          "name": "Jun23",
+          "year": "2023",
+          "entry_date": "2023-05-02",
+          "signal_value": 153,
+          "entry": 150,
+          "exit": -35,
+          "pnl": 185,
+          "max_drawdown": 12,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jun23",
+              "sell 2 Jul23",
+              "buy 1 Aug23"
+            ],
+            "lookback_close": -3,
+            "stop": 180,
+            "exit_date": "2023-05-30",
+            "pnl_no_stop": 185,
+            "max_drawdown_no_stop": 12
+          }
+        },
+        {
+          "name": "Jul23",
+          "year": "2023",
+          "entry_date": "2023-06-01",
+          "signal_value": 11,
+          "entry": 36,
+          "exit": -49,
+          "pnl": 85,
+          "max_drawdown": 6,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jul23",
+              "sell 2 Aug23",
+              "buy 1 Sep23"
+            ],
+            "lookback_close": 25,
+            "stop": 66,
+            "exit_date": "2023-06-30",
+            "pnl_no_stop": 85,
+            "max_drawdown_no_stop": 6
+          }
+        },
+        {
+          "name": "Nov23",
+          "year": "2023",
+          "entry_date": "2023-10-02",
+          "signal_value": 3,
+          "entry": 6,
+          "exit": -45,
+          "pnl": 51,
+          "max_drawdown": 15,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Nov23",
+              "sell 2 Dec23",
+              "buy 1 Jan24"
+            ],
+            "lookback_close": 3,
+            "stop": 36,
+            "exit_date": "2023-10-31",
+            "pnl_no_stop": 51,
+            "max_drawdown_no_stop": 15
+          }
+        },
+        {
+          "name": "Feb24",
+          "year": "2024",
+          "entry_date": "2024-01-02",
+          "signal_value": 1,
+          "entry": -18,
+          "exit": -25,
+          "pnl": 7,
+          "max_drawdown": 23,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Feb24",
+              "sell 2 Mar24",
+              "buy 1 Apr24"
+            ],
+            "lookback_close": -19,
+            "stop": 12,
+            "exit_date": "2024-01-31",
+            "pnl_no_stop": 7,
+            "max_drawdown_no_stop": 23
+          }
+        },
+        {
+          "name": "Mar24",
+          "year": "2024",
+          "entry_date": "2024-02-02",
+          "signal_value": 1,
+          "entry": -14,
+          "exit": 16,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Mar24",
+              "sell 2 Apr24",
+              "buy 1 May24"
+            ],
+            "lookback_close": -15,
+            "stop": 16,
+            "exit_date": "2024-02-20",
+            "pnl_no_stop": 29,
+            "max_drawdown_no_stop": 44
+          }
+        },
+        {
+          "name": "Sep24",
+          "year": "2024",
+          "entry_date": "2024-08-01",
+          "signal_value": 17,
+          "entry": 24,
+          "exit": 54,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Sep24",
+              "sell 2 Oct24",
+              "buy 1 Nov24"
+            ],
+            "lookback_close": 7,
+            "stop": 54,
+            "exit_date": "2024-08-14",
+            "pnl_no_stop": 13,
+            "max_drawdown_no_stop": 34
+          }
+        },
+        {
+          "name": "Feb25",
+          "year": "2025",
+          "entry_date": "2025-01-02",
+          "signal_value": 46,
+          "entry": 35,
+          "exit": 65,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 Feb25",
+              "sell 2 Mar25",
+              "buy 1 Apr25"
+            ],
+            "lookback_close": -11,
+            "stop": 65,
+            "exit_date": "2025-01-09",
+            "pnl_no_stop": 0,
+            "max_drawdown_no_stop": 44
+          }
+        },
+        {
+          "name": "Mar25",
+          "year": "2025",
+          "entry_date": "2025-02-03",
+          "signal_value": 6,
+          "entry": 14,
+          "exit": -15,
+          "pnl": 29,
+          "max_drawdown": 16,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Mar25",
+              "sell 2 Apr25",
+              "buy 1 May25"
+            ],
+            "lookback_close": 8,
+            "stop": 44,
+            "exit_date": "2025-02-28",
+            "pnl_no_stop": 29,
+            "max_drawdown_no_stop": 16
+          }
+        },
+        {
+          "name": "May25",
+          "year": "2025",
+          "entry_date": "2025-04-02",
+          "signal_value": 6,
+          "entry": 24,
+          "exit": 54,
+          "pnl": -30,
+          "max_drawdown": 30,
+          "status": "stopped",
+          "details": {
+            "legs": [
+              "buy 1 May25",
+              "sell 2 Jun25",
+              "buy 1 Jul25"
+            ],
+            "lookback_close": 18,
+            "stop": 54,
+            "exit_date": "2025-04-07",
+            "pnl_no_stop": 24,
+            "max_drawdown_no_stop": 53
+          }
+        },
+        {
+          "name": "Dec25",
+          "year": "2025",
+          "entry_date": "2025-11-03",
+          "signal_value": 27,
+          "entry": 4,
+          "exit": 4,
+          "pnl": 0,
+          "max_drawdown": 1,
+          "status": "flat",
+          "details": {
+            "legs": [
+              "buy 1 Dec25",
+              "sell 2 Jan26",
+              "buy 1 Feb26"
+            ],
+            "lookback_close": -23,
+            "stop": 34,
+            "exit_date": "2025-11-28",
+            "pnl_no_stop": 0,
+            "max_drawdown_no_stop": 1
+          }
+        },
+        {
+          "name": "Jan26",
+          "year": "2026",
+          "entry_date": "2025-12-01",
+          "signal_value": 26,
+          "entry": 5,
+          "exit": -29,
+          "pnl": 34,
+          "max_drawdown": 5,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jan26",
+              "sell 2 Feb26",
+              "buy 1 Mar26"
+            ],
+            "lookback_close": -21,
+            "stop": 35,
+            "exit_date": "2025-12-31",
+            "pnl_no_stop": 34,
+            "max_drawdown_no_stop": 5
+          }
+        },
+        {
+          "name": "Feb26",
+          "year": "2026",
+          "entry_date": "2026-01-02",
+          "signal_value": 9,
+          "entry": -4,
+          "exit": -17,
+          "pnl": 13,
+          "max_drawdown": 2,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Feb26",
+              "sell 2 Mar26",
+              "buy 1 Apr26"
+            ],
+            "lookback_close": -13,
+            "stop": 26,
+            "exit_date": "2026-01-30",
+            "pnl_no_stop": 13,
+            "max_drawdown_no_stop": 2
+          }
+        },
+        {
+          "name": "Jul26",
+          "year": "2026",
+          "entry_date": "2026-06-03",
+          "signal_value": 4,
+          "entry": -9,
+          "exit": -13,
+          "pnl": 4,
+          "max_drawdown": 17,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Jul26",
+              "sell 2 Aug26",
+              "buy 1 Sep26"
+            ],
+            "lookback_close": -13,
+            "stop": 21,
+            "exit_date": "2026-06-30",
+            "pnl_no_stop": 4,
+            "max_drawdown_no_stop": 17
+          }
+        },
+        {
+          "name": "Aug26",
+          "year": "2026",
+          "entry_date": "2026-07-01",
+          "signal_value": 4,
+          "entry": -5,
+          "exit": -43,
+          "pnl": 38,
+          "max_drawdown": 8,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Aug26",
+              "sell 2 Sep26",
+              "buy 1 Oct26"
+            ],
+            "lookback_close": -9,
+            "stop": 25,
+            "exit_date": "2026-07-31",
+            "pnl_no_stop": 38,
+            "max_drawdown_no_stop": 8
+          }
+        },
+        {
+          "name": "Nov26",
+          "year": "2026",
+          "entry_date": "2026-10-01",
+          "signal_value": 6,
+          "entry": 4,
+          "exit": -55,
+          "pnl": 59,
+          "max_drawdown": 0,
+          "status": "held",
+          "details": {
+            "legs": [
+              "buy 1 Nov26",
+              "sell 2 Dec26",
+              "buy 1 Jan27"
+            ],
+            "lookback_close": -2,
+            "stop": 34,
+            "exit_date": "2026-10-30",
+            "pnl_no_stop": 59,
+            "max_drawdown_no_stop": 0
+          }
+        },
+        {
+          "name": "Dec26",
+          "year": "2026",
+          "entry_date": "2026-11-02",
+          "signal_value": 16,
+          "entry": -11,
+          "exit": -32,
+          "pnl": 21,
+          "max_drawdown": 8,
+          "status": "open",
+          "details": {
+            "legs": [
+              "buy 1 Dec26",
+              "sell 2 Jan27",
+              "buy 1 Feb27"
+            ],
+            "lookback_close": -27,
+            "stop": 19,
+            "exit_date": null,
+            "pnl_no_stop": null,
+            "max_drawdown_no_stop": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "next",
+      "type": "callout",
+      "tone": "info",
+      "title": "Next signal",
+      "text": "Jan27 butterfly: check 1 Dec 2026 against about 5 Oct 2026; exit 31 Dec 2026."
+    },
+    {
+      "id": "caveats",
+      "type": "notes",
+      "title": "Caveats",
+      "items": [
+        "butterflies fell in about 74% of all test months regardless of signal",
+        "run-up filter edge strong in 2023-26, weak in 2021-22 (out-of-sample)",
+        "estimated confidence the filter is real: 55-60%",
+        "10 of 11 stop-outs would have ended flat or profitable without the stop",
+        "Backtest only, not advice."
+      ]
+    }
+  ]
+}
