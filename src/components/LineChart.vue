@@ -157,6 +157,10 @@ const MIN_SPAN = 5
 const ZOOM_SPEED = 0.002
 /** Room the tooltip needs beside the crosshair (its widest line plus the 14px gap) */
 const TOOLTIP_PX = 215
+/** Same, for the compact tooltip on narrow plots (phones) */
+const TOOLTIP_COMPACT_PX = 135
+/** Plots narrower than this (CSS px) get the compact tooltip */
+const COMPACT_BELOW_PX = 520
 /** How far the tooltip may spill into the axis gutters on either side of the plot */
 const GUTTER_PX = 40
 /** Horizontal room each rotated time label needs on a T-n axis */
@@ -768,11 +772,15 @@ function volumePane(
 /** Blur the chart: while loading, on error, or when there's nothing to plot */
 const veiled = computed(() => props.loading || !!props.error || !chart.value)
 
+/** Narrow plot (phones): a smaller tooltip so it covers less of the chart */
+const compactTip = computed(() => plotWidth.value < COMPACT_BELOW_PX)
+
 function tooltipSide(fx: number): 'right' | 'left' | 'center' {
+  const room = compactTip.value ? TOOLTIP_COMPACT_PX : TOOLTIP_PX
   const at = fx * plotWidth.value
-  if (at + TOOLTIP_PX <= plotWidth.value + GUTTER_PX && fx <= 0.6) return 'right'
-  if (at - TOOLTIP_PX >= -GUTTER_PX) return 'left'
-  if (at + TOOLTIP_PX <= plotWidth.value + GUTTER_PX) return 'right'
+  if (at + room <= plotWidth.value + GUTTER_PX && fx <= 0.6) return 'right'
+  if (at - room >= -GUTTER_PX) return 'left'
+  if (at + room <= plotWidth.value + GUTTER_PX) return 'right'
   return 'center'
 }
 
@@ -1182,7 +1190,7 @@ function onKeydown(e: KeyboardEvent) {
               />
               <div
                 class="tooltip"
-                :class="[tip.side, { synced: tip.synced }]"
+                :class="[tip.side, { synced: tip.synced, compact: compactTip }]"
                 :style="{ left: tip.side === 'center' ? '50%' : tip.left }"
               >
                 <span class="tip-date">{{ tip.date }}</span>
@@ -1643,6 +1651,29 @@ function onKeydown(e: KeyboardEvent) {
 .tooltip.center {
   transform: translateX(-50%);
   max-width: calc(100% + 5rem);
+}
+/* Narrow plots (phones): tighter and smaller so less of the chart is covered */
+.tooltip.compact {
+  gap: 0.05rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  transform: translateX(8px);
+}
+.tooltip.compact.left {
+  transform: translateX(calc(-100% - 8px));
+}
+.tooltip.compact.center {
+  transform: translateX(-50%);
+}
+.tooltip.compact .tip-when {
+  margin-top: 0;
+  font-size: 0.65rem;
+}
+.tooltip.compact .tip-row {
+  gap: 0.6rem;
 }
 .tip-when {
   margin-top: -0.15rem;
