@@ -52,8 +52,8 @@ const CHART_HEIGHTS: Record<PerRow, number> = { 1: 260, 2: 240, 3: 220 }
 /** Charts per row until the viewer picks another for the product */
 const DEFAULT_PER_ROW: PerRow = 2
 const perRow = ref<PerRow>(DEFAULT_PER_ROW)
-/** Draw each spread's fair value on its chart */
-const showFairValue = ref(true)
+/** Draw each spread's fair value on its chart (off until the viewer turns it on) */
+const showFairValue = ref(false)
 /** Price drawn as a line through the closes, or as OHLC candles (remembered per product) */
 const priceStyle = ref<PriceStyle>('line')
 const PRICE_STYLES: { value: PriceStyle; label: string; title: string }[] = [
@@ -433,7 +433,7 @@ watch(
       : []
     rollsOpen.value = false
     displayOpen.value = false
-    showFairValue.value = readSaved().fairValue !== false
+    showFairValue.value = readSaved().fairValue === true
     priceStyle.value = readSaved().priceStyle === 'candles' ? 'candles' : 'line'
     showPrice.value = true
     volume.value = 'off'
