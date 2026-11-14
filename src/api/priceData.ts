@@ -27,6 +27,10 @@ export interface ProductInfo {
   name: string
   exchange: string
   currency: string
+  /** Minimum price move, e.g. 0.05; absent until set with db:set-tick */
+  tickSize?: number
+  /** Value of one tick for one contract, in `currency` */
+  tickValue?: number
 }
 
 export interface PriceBar {

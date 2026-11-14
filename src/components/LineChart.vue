@@ -105,6 +105,11 @@ const props = withDefaults(
     refValue?: number | null
     /** Label before the reference value, e.g. "FV" */
     refLabel?: string
+    /**
+     * The product's minimum price move, e.g. 0.05: price axis lines then fall on whole numbers of
+     * ticks (1, 2, 5, 10 … ticks apart) and the crosshair's price snaps to a tick. null = any step.
+     */
+    tickSize?: number | null
   }>(),
   {
     initialCount: 65,
@@ -128,6 +133,7 @@ const props = withDefaults(
     syncKey: null,
     refValue: null,
     refLabel: '',
+    tickSize: null,
   },
 )
 
@@ -176,6 +182,8 @@ const PLACEHOLDER = (() => {
 const hover = ref<number | null>(null)
 /** The pointer is over the volume pane (not the line plot): the tooltip then shows AVol / BVol */
 const hoverInPane = ref(false)
+/** The pointer's height over the plot, in SVG units (0 … H), for the crosshair's horizontal line */
+const pointerY = ref<number | null>(null)
 const hitEl = ref<HTMLElement | null>(null)
 
 /** Plot width in CSS px, so rotated time labels can be spaced to never overlap */
@@ -390,6 +398,37 @@ function niceStep(span: number, count: number) {
   return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag
 }
 
+/** The product's tick size, when set to a usable number */
+const tick = computed(() =>
+  typeof props.tickSize === 'number' && Number.isFinite(props.tickSize) && props.tickSize > 0
+    ? props.tickSize
+    : null,
+)
+
+/** Rounds away float noise, e.g. 0.05 × 3 = 0.15000000000000002 → 0.15 */
+const tidy = (v: number) => Number(v.toPrecision(12))
+
+/** Decimal places a number needs, e.g. 0.25 → 2, 5 → 0 */
+function decimalsOf(v: number) {
+  const s = String(tidy(v))
+  const e = s.indexOf('e-')
+  if (e >= 0) return Number(s.slice(e + 2)) + (s.slice(0, e).split('.')[1]?.length ?? 0)
+  return s.split('.')[1]?.length ?? 0
+}
+
+/**
+ * Price axis step for a visible range: about 4 intervals. With a tick size it is always a whole
+ * number of ticks: the usual round step (1, 2, 5, 10 …) when that is one, else 1, 2, 5, 10 … ticks.
+ */
+function axisStep(span: number) {
+  const nice = niceStep(span, 4)
+  const t = tick.value
+  if (t === null) return nice
+  const ticks = nice / t
+  if (ticks >= 1 && Math.abs(ticks - Math.round(ticks)) < 1e-9) return nice
+  return tidy(t * Math.max(1, niceStep(span / t, 4)))
+}
+
 /* ---------- Viewport ---------- */
 
 function clampSpan(span: number) {
@@ -510,8 +549,8 @@ const chart = computed(() => {
   const y = (val: number) => (1 - (val - min) / (max - min)) * lineH
   const pct = (u: number, total: number) => `${((u / total) * 100).toFixed(3)}%`
 
-  const step = niceStep(max - min, 4)
-  const decimals = Math.max(0, -Math.floor(Math.log10(step)))
+  const step = axisStep(max - min)
+  const decimals = decimalsOf(step)
   const yTicks: { label: string; top: string }[] = []
   let grid = ''
   for (let val = Math.ceil(min / step) * step; val <= max; val += step) {
@@ -793,6 +832,35 @@ const tip = computed(() => {
   }
 })
 
+/**
+ * The crosshair's horizontal line, at the pointer's height (only under this chart's own pointer,
+ * not one mirrored from another chart). Over the line plot it carries the price at that height on
+ * the right axis; over the volume pane, just the line.
+ */
+const hLine = computed(() => {
+  const c = chart.value
+  const yU = pointerY.value
+  if (!c || yU === null || shown.value?.synced !== false) return null
+  const { lineH } = bands.value
+  const overLine = !lineHidden.value && yU <= lineH
+  if (!overLine) return { top: `${((yU / H) * 100).toFixed(3)}%`, label: null }
+  let price = c.yMax - (yU / lineH) * (c.yMax - c.yMin)
+  // With a tick size: snap to the nearest tick, and the line to that price's height
+  const t = tick.value
+  if (t !== null) price = tidy(Math.round(price / t) * t)
+  const at = t === null ? yU : ((c.yMax - price) / (c.yMax - c.yMin)) * lineH
+  return {
+    top: `${((clamp(at, 0, lineH) / H) * 100).toFixed(3)}%`,
+    label:
+      t === null
+        ? valueFmt.format(price)
+        : price.toLocaleString('en-US', {
+            minimumFractionDigits: decimalsOf(t),
+            maximumFractionDigits: decimalsOf(t),
+          }),
+  }
+})
+
 /* ---------- Pointer, wheel & keyboard ---------- */
 
 let drag: {
@@ -806,10 +874,11 @@ const dragging = ref(false)
 
 function plotFraction(clientX: number, clientY?: number) {
   const rect = hitEl.value!.getBoundingClientRect()
-  if (clientY !== undefined && volumeOn.value) {
+  if (clientY !== undefined) {
+    pointerY.value = clamp(((clientY - rect.top) / rect.height) * H, 0, H)
     // Split at the middle of the gap between the line plot and the volume pane
     const { lineH, paneTop } = bands.value
-    hoverInPane.value = ((clientY - rect.top) / rect.height) * H >= (lineH + paneTop) / 2
+    if (volumeOn.value) hoverInPane.value = pointerY.value >= (lineH + paneTop) / 2
   }
   return { fx: (clientX - rect.left) / rect.width, width: rect.width, height: rect.height }
 }
@@ -1100,6 +1169,12 @@ function onKeydown(e: KeyboardEvent) {
           >
             <template v-if="tip">
               <div class="crosshair" :style="{ left: tip.left }" />
+              <template v-if="hLine">
+                <div class="crosshair-h" :style="{ top: hLine.top }" />
+                <span v-if="hLine.label" class="cursor-tag" :style="{ top: hLine.top }">{{
+                  hLine.label
+                }}</span>
+              </template>
               <div
                 v-if="tip.inside && !tip.inPane && !tip.ohlc"
                 class="dot"
@@ -1500,6 +1575,32 @@ function onKeydown(e: KeyboardEvent) {
   bottom: 0;
   width: 1px;
   background: var(--color-border-hover);
+  pointer-events: none;
+}
+
+.crosshair-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--color-border-hover);
+  pointer-events: none;
+}
+
+/* Price at the crosshair's height, on the right axis (over the latest-value tag) */
+.cursor-tag {
+  position: absolute;
+  left: calc(100% + 0.6rem);
+  z-index: 1;
+  transform: translateY(-50%);
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  background: var(--color-heading);
+  color: var(--color-background-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   pointer-events: none;
 }
 

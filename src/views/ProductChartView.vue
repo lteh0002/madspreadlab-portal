@@ -683,6 +683,7 @@ onUnmounted(() => spreadsCtl?.abort())
           :locked="compact"
           :height="CHART_HEIGHTS[columns]"
           :fixed-interval="fixedInterval"
+          :tick-size="info?.tickSize ?? null"
           :hover-key="hoverKey"
           :show-fair-value="showFairValue"
           :show-price="showPrice"

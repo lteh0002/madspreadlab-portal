@@ -50,6 +50,8 @@ const props = defineProps<{
   showPrice: boolean
   /** Interval fixed by the Spreads-page group (for the empty message); null = any */
   fixedInterval: number | null
+  /** The product's minimum price move, for the price axis steps; null when not set */
+  tickSize: number | null
 }>()
 
 const emit = defineEmits<{
@@ -264,6 +266,7 @@ const period = computed(() => {
       :height="height"
       :initial-count="initialCount"
       value-label="Close"
+      :tick-size="tickSize"
       :price-style="priceStyle"
       :volume="volume"
       :volume-share="VOLUME_SHARE"
