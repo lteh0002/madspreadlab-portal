@@ -13,8 +13,10 @@ const props = withDefaults(
     subtitle?: string
     /** While true the pop-up can't be closed (e.g. a request in flight) */
     busy?: boolean
+    /** Wider panel, for tables */
+    wide?: boolean
   }>(),
-  { subtitle: '', busy: false },
+  { subtitle: '', busy: false, wide: false },
 )
 
 const open = defineModel<boolean>('open', { required: true })
@@ -56,6 +58,7 @@ defineExpose({ close })
   <dialog
     ref="dialog"
     class="app-dialog"
+    :class="{ wide }"
     :aria-labelledby="titleId"
     @close="open = false"
     @cancel="onCancel"
@@ -88,6 +91,9 @@ defineExpose({ close })
   background: var(--color-background-soft);
   color: var(--color-text);
   box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+}
+.app-dialog.wide {
+  width: min(1100px, calc(100vw - 2rem));
 }
 .app-dialog::backdrop {
   background: color-mix(in srgb, var(--color-background) 70%, transparent);

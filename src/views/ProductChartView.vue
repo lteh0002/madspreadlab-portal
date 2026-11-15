@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import LineChart, { type LinePoint } from '@/components/LineChart.vue'
+import VolumeTableDialog from '@/components/VolumeTableDialog.vue'
 import SpreadChartPanel, {
   type DaySelection,
   type PriceStyle,
@@ -67,6 +68,8 @@ const showPrice = ref(true)
  * like the Price toggle that goes with it: turn it on when needed.
  */
 const volume = ref<VolumeView>('off')
+/** Pop-up with each roll's buy / sell volume per day */
+const volumeTableOpen = ref(false)
 /** Rolls the viewer has unticked in the Charts dropdown (the first chart always shows) */
 const hiddenIds = ref<string[]>([])
 
@@ -595,6 +598,16 @@ onUnmounted(() => spreadsCtl?.abort())
             v-if="compact"
             type="button"
             class="menu-btn"
+            title="Buy / sell volume per day for each roll"
+            @click="volumeTableOpen = true"
+          >
+            <AppIcon name="list" :size="16" class="menu-chev" />
+            Vol table
+          </button>
+          <button
+            v-if="compact"
+            type="button"
+            class="menu-btn"
             aria-haspopup="true"
             :aria-expanded="displayOpen"
             aria-controls="display-options"
@@ -665,9 +678,26 @@ onUnmounted(() => spreadsCtl?.abort())
               <AppIcon name="check" :size="14" :stroke-width="2.5" class="chip-check" />
               Volume
             </button>
+            <button
+              v-if="!compact"
+              type="button"
+              class="chip"
+              title="Buy / sell volume per day for each roll on screen"
+              @click="volumeTableOpen = true"
+            >
+              <AppIcon name="list" :size="14" class="menu-chev" />
+              Vol table
+            </button>
           </div>
         </div>
       </section>
+
+      <VolumeTableDialog
+        v-model:open="volumeTableOpen"
+        :spreads="visibleSpreads"
+        :interval="interval"
+        :last-day="lastDay"
+      />
 
       <div class="grid" :class="`per-${columns}`">
         <SpreadChartPanel
@@ -761,6 +791,8 @@ h1 {
   flex: 1 1 100%;
 }
 .controls.compact .display-wrap {
+  display: flex;
+  gap: 0.5rem;
   margin-left: auto;
 }
 
