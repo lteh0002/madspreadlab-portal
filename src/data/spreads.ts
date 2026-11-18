@@ -218,6 +218,30 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
             badge: 'CN',
             tags: ['China'],
           },
+          {
+            name: 'roll-225',
+            label: '225 Roll',
+            pageTitle: '225 Index Roll',
+            // Opens the price chart from the database (price_data), like the other rolls
+            routeName: 'product-chart',
+            routeParams: { product: '225' },
+            description: 'Nikkei 225 roll',
+            emoji: '🇯🇵',
+            badge: '225',
+            tags: ['Japan'],
+          },
+          {
+            name: 'roll-tpx',
+            label: 'TPX Roll',
+            pageTitle: 'TPX Index Roll',
+            // Opens the price chart from the database (price_data), like the other rolls
+            routeName: 'product-chart',
+            routeParams: { product: 'TPX' },
+            description: 'TOPIX roll',
+            emoji: '🇯🇵',
+            badge: 'TPX',
+            tags: ['Japan'],
+          },
         ],
       },
       {
