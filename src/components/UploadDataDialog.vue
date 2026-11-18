@@ -3,7 +3,14 @@ import { computed, nextTick, ref, useId, watch } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { UPLOAD_EXTENSIONS, UPLOAD_MAX_BYTES, uploadProductData } from '@/api/products'
-import { DATA_FILE_EXAMPLE, parseDataFileName, type DataFileInfo } from '@/api/dataFileName'
+import {
+  DATA_FILE_EXAMPLE,
+  DATA_FILE_EXAMPLE_GAP,
+  DATA_FILE_EXAMPLE_OUTRIGHT,
+  intervalLabel,
+  parseDataFileName,
+  type DataFileInfo,
+} from '@/api/dataFileName'
 
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ uploaded: [name: string, file: File] }>()
@@ -244,9 +251,12 @@ async function uploadMore() {
               <template v-else><strong>Choose files</strong> or drag them here</template>
             </span>
             <span v-show="!items.length" :id="id('file-hint')" class="hint">
-              Name each like <code class="example">{{ DATA_FILE_EXAMPLE }}.csv</code><br />
+              Name each like <code class="example">{{ DATA_FILE_EXAMPLE }}.csv</code>,
+              <code class="example">{{ DATA_FILE_EXAMPLE_GAP }}.csv</code> or
+              <code class="example">{{ DATA_FILE_EXAMPLE_OUTRIGHT }}.csv</code><br />
               {{ TYPES_LABEL }} · up to {{ MAX_LABEL }} each<br />
-              Columns: Timestamp (UTC), Open, High, Low, Close · optional AVol, BVol
+              Columns: Timestamp (UTC; a date alone for Daily), Open, High, Low, Close · optional
+              AVol, BVol
             </span>
           </label>
 
@@ -300,8 +310,8 @@ async function uploadMore() {
                   {{ item.message || `Data added to ${item.info!.product}.` }}
                 </span>
                 <span v-else-if="item.info" class="file-msg">
-                  {{ item.info.product }} · {{ item.info.near }} – {{ item.info.far }} ·
-                  {{ item.info.structure }} · {{ item.info.minutes }} min ·
+                  {{ item.info.product }} · {{ item.info.legs.join(' / ') }} ·
+                  {{ item.info.structure }} · {{ intervalLabel(item.info.minutes) }} ·
                   {{ formatSize(item.file.size) }}
                 </span>
               </span>

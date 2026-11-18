@@ -13,8 +13,12 @@ export interface ProductSpread {
   id: string
   /** Futures month codes, e.g. "V-X" */
   spreadName: string
-  /** Contract months, e.g. "Oct26", "Nov26" */
+  /** Older API responses omit it: Calendar */
+  structure?: 'Outright' | 'Calendar' | 'Butterfly'
+  /** Contract months, e.g. "Oct26", "Nov26"; a butterfly's wings */
   front: string
+  /** A butterfly's middle contract (absent on calendars) */
+  middle?: string
   back: string
   /** Fair value of the spread, when one has been set (null or absent otherwise) */
   fairValue?: number | null
@@ -58,12 +62,17 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await res.json()) as T
 }
 
-/** GET /api/spreads?product=MCA — the product and its spreads that have price data */
-export function fetchProductSpreads(product: string, signal?: AbortSignal) {
-  return getJson<{ product: ProductInfo; data: ProductSpread[] }>(
-    `/api/spreads?product=${encodeURIComponent(product)}`,
-    signal,
-  )
+/**
+ * GET /api/spreads?product=MCA[&structure=Outright] — the product and its spreads that have
+ * price data: calendars, or the given structure
+ */
+export function fetchProductSpreads(
+  product: string,
+  signal?: AbortSignal,
+  structure?: 'Outright' | 'Calendar' | 'Butterfly',
+) {
+  const qs = new URLSearchParams({ product, ...(structure && { structure }) })
+  return getJson<{ product: ProductInfo; data: ProductSpread[] }>(`/api/spreads?${qs}`, signal)
 }
 
 /** GET /api/price-data?spreadId=…&interval=15 — OHLC bars, oldest first */

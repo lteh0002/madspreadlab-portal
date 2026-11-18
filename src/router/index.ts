@@ -35,6 +35,13 @@ const router = createRouter({
       props: true,
     },
     {
+      // Futures curve from outright prices, e.g. /spreads/products/FCPO/curve
+      path: '/spreads/products/:product/curve',
+      name: 'term-structure',
+      component: () => import('../views/TermStructureView.vue'),
+      props: true,
+    },
+    {
       path: '/spreads/:spreadName/chart',
       name: 'spread-chart',
       component: () => import('../views/SpreadChartView.vue'),

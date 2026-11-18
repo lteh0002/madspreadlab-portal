@@ -59,12 +59,15 @@ export interface SpreadSection {
 }
 
 /**
- * A product's category: the same three views for each product. Term Structure and Butterfly
- * have no page yet, so they show "Soon".
+ * A product's category: the same three views for each product. Butterfly has no page yet, and
+ * the curve shows "Soon" until `curve` is set (the product needs outright prices uploaded).
  * `dbProduct` is the product's name in the database when it differs from the name shown
  * (e.g. FTW is stored as TWN).
  */
-function commodityGroup(product: string, dbProduct = product): SpreadGroup {
+function commodityGroup(
+  product: string,
+  { dbProduct = product, curve = false }: { dbProduct?: string; curve?: boolean } = {},
+): SpreadGroup {
   const slug = product.toLowerCase()
   return {
     title: product,
@@ -72,10 +75,13 @@ function commodityGroup(product: string, dbProduct = product): SpreadGroup {
       {
         name: `${slug}-term-structure`,
         label: 'Curve',
+        pageTitle: `${product} Curve`,
         description: 'Futures curve',
         badge: product,
         tags: ['Term Structure'],
-        comingSoon: true,
+        ...(curve
+          ? { routeName: 'term-structure', routeParams: { product: dbProduct } }
+          : { comingSoon: true }),
       },
       {
         name: `${slug}-butterfly`,
@@ -110,7 +116,7 @@ export const SPREAD_SECTIONS: SpreadSection[] = [
   {
     title: 'Commodities',
     icon: 'database',
-    groups: [commodityGroup('FCPO'), commodityGroup('TF')],
+    groups: [commodityGroup('FCPO', { curve: true }), commodityGroup('TF')],
   },
   {
     title: 'Indices',
