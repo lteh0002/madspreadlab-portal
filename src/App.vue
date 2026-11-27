@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AppIcon, { type IconName } from '@/components/AppIcon.vue'
 import { logout, refreshUser } from '@/api/auth'
@@ -41,13 +41,19 @@ watch(isAdmin, (admin) => {
   if (!admin && route.meta.admin && getSession()) void router.replace('/spreads')
 })
 
+// Desktop sidebar can collapse to an icon-only rail; remembered across visits
+const COLLAPSE_KEY = 'sidebarCollapsed'
+const collapsed = ref(localStorage.getItem(COLLAPSE_KEY) === '1')
+watch(collapsed, (v) => localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0'))
+const collapseLabel = computed(() => (collapsed.value ? 'Expand sidebar' : 'Collapse sidebar'))
+
 const isActive = (item: NavItem) => route.path.startsWith(item.to)
 const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' : 'dark'} mode`)
 </script>
 
 <template>
   <RouterView v-if="route.meta.bare" />
-  <div v-else class="shell">
+  <div v-else class="shell" :class="{ collapsed }">
     <aside class="sidebar">
       <div class="brand">
         <img class="logo" :src="logoUrl" alt="" width="40" height="40" />
@@ -62,19 +68,43 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
           class="nav-item"
           :class="{ active: isActive(item) }"
           :aria-current="isActive(item) ? 'page' : undefined"
+          :title="collapsed ? item.label : undefined"
         >
           <AppIcon :name="item.icon" :size="22" />
           <span class="nav-label">{{ item.label }}</span>
         </RouterLink>
       </nav>
+
+      <button
+        type="button"
+        class="collapse-btn"
+        :aria-label="collapseLabel"
+        :title="collapseLabel"
+        :aria-expanded="!collapsed"
+        @click="collapsed = !collapsed"
+      >
+        <AppIcon name="panel-left" :size="20" />
+      </button>
     </aside>
 
     <div class="content">
       <div class="topbar">
-        <button type="button" class="icon-btn" :aria-label="themeLabel" :title="themeLabel" @click="toggle">
+        <button
+          type="button"
+          class="icon-btn"
+          :aria-label="themeLabel"
+          :title="themeLabel"
+          @click="toggle"
+        >
           <AppIcon :name="theme === 'dark' ? 'moon' : 'sun'" :size="20" />
         </button>
-        <button type="button" class="icon-btn" aria-label="Sign out" title="Sign out" @click="signOut">
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Sign out"
+          title="Sign out"
+          @click="signOut"
+        >
           <AppIcon name="log-out" :size="20" />
         </button>
       </div>
@@ -86,8 +116,12 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 <style scoped>
 .shell {
   display: grid;
-  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100vh;
+  transition: grid-template-columns 0.2s ease;
+}
+.shell.collapsed {
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 /* ---------- Sidebar ---------- */
@@ -97,8 +131,9 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
   height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  padding: 1.75rem 1.25rem 1.25rem;
+  gap: 1.5rem;
+  padding: 1.5rem 0.85rem 1rem;
+  overflow: hidden;
   --icon-cutout: var(--color-sidebar);
   background:
     radial-gradient(140% 50% at 0% 100%, var(--color-sidebar-glow), transparent 70%),
@@ -110,8 +145,8 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.25rem 0.75rem 1.75rem;
+  gap: 0.65rem;
+  padding: 0.25rem 0.5rem 1.5rem;
   margin-bottom: -0.25rem;
   border-radius: 0;
   border-bottom: 1px solid var(--color-border);
@@ -119,13 +154,14 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 
 .logo {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 
 .brand-text {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
+  white-space: nowrap;
   letter-spacing: -0.01em;
   color: var(--color-heading);
 }
@@ -143,11 +179,12 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1.1rem;
+  gap: 0.85rem;
+  padding: 0.7rem 0.9rem;
   border-radius: var(--radius-md);
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  white-space: nowrap;
   border: 1px solid transparent;
   transition:
     background 0.2s,
@@ -158,7 +195,11 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
   color: var(--color-heading);
 }
 .nav-item.active {
-  background: linear-gradient(135deg, var(--color-accent-solid), color-mix(in srgb, var(--color-accent-solid) 70%, #000));
+  background: linear-gradient(
+    135deg,
+    var(--color-accent-solid),
+    color-mix(in srgb, var(--color-accent-solid) 70%, #000)
+  );
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   color: var(--color-on-accent);
   font-weight: 500;
@@ -172,6 +213,52 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 }
 .nav-item.active :deep(svg) {
   color: var(--color-on-accent);
+}
+
+.collapse-btn {
+  margin-top: auto;
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-left: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.collapse-btn:hover {
+  background: var(--color-background-mute);
+  color: var(--color-heading);
+}
+.collapse-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Collapsed: icon-only rail (desktop only; narrow screens use the top bar) */
+@media (min-width: 901px) {
+  .shell.collapsed .brand {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .shell.collapsed .brand-text,
+  .shell.collapsed .nav-label {
+    display: none;
+  }
+  .shell.collapsed .nav-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .shell.collapsed .collapse-btn {
+    align-self: center;
+    margin-left: 0;
+  }
 }
 
 /* ---------- Content ---------- */
@@ -214,7 +301,8 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
 
 /* ---------- Narrow screens: sidebar becomes a top bar ---------- */
 @media (max-width: 900px) {
-  .shell {
+  .shell,
+  .shell.collapsed {
     grid-template-columns: minmax(0, 1fr);
     /* keep the bar its natural height; spare height goes to the page */
     grid-template-rows: auto 1fr;
@@ -229,6 +317,7 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
     /* right: clear the fixed top-bar buttons (1rem offset + two 42px buttons + their gap) plus a gap */
     padding: 0.6rem calc(1rem + 2 * 42px + 0.25rem + 0.5rem) 0.6rem 1rem;
     border-right: 0;
+    overflow: visible;
     border-bottom: 1px solid var(--color-border);
     /* translucent so page artwork shows through as it scrolls under */
     background: color-mix(in srgb, var(--color-sidebar) 45%, transparent);
@@ -241,7 +330,8 @@ const themeLabel = computed(() => `Switch to ${theme.value === 'dark' ? 'light' 
     border: 0;
   }
   .brand-text,
-  .nav-label {
+  .nav-label,
+  .collapse-btn {
     display: none;
   }
   .nav {
